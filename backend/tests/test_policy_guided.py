@@ -88,4 +88,5 @@ def test_min_items_are_data():
     areas = load_areas()
     assert {area: spec["min_items"] for area, spec in areas.items()} == {
         "status": 1, "history": 2, "interests": 2, "strengths": 1,
-        "family_social": 2, "values": 1, "pressures": 1, "sure": 1, "goals": 1, "options": 1}
+        "family_social": 2, "values": 1, "pressures": 1, "sure": 1, "goals": 1, "options": 1,
+        "weaknesses": 1}

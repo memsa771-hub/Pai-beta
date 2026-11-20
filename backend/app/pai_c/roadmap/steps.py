@@ -151,6 +151,23 @@ def _marks(rule: Rule, standing: Standing, record: dict | None, row) -> dict:
                  timing=dict(improve) if improve else {"unknown": True})
 
 
+def _subject_codes(text: str, catalog) -> list[str]:
+    """Subject codes a required-subjects text names: the whole text as one
+    subject, else every subject whose label or a synonym of 4+ letters stands
+    in it as a word ("Mathematics (else deficiency ...)", "Physics/Chemistry/Maths ...")."""
+    from app.memory.catalog import norm
+    code = catalog.choice_code("subjects", text)
+    if code:
+        return [code]
+    words = f" {norm(text)} "
+    found = []
+    for choice in catalog.choices("subjects"):
+        names = [choice.label, *choice.synonyms]
+        if any(len(norm(name)) >= 4 and f" {norm(name)} " in words for name in names):
+            found.append(choice.code)
+    return found
+
+
 def _strengthen(rule: Rule | None, rows: list) -> list[dict]:
     """A red "Strengthen <subject>" step for each subject the route requires
     (admission rule required_subjects) that the student is weak in now: a
@@ -168,10 +185,11 @@ def _strengthen(rule: Rule | None, rows: list) -> list[dict]:
             if code:
                 stated.setdefault(code, row)
     derived = {weak["subject"]: weak["row"] for weak in weak_subjects(rows) if weak["subject"]}
-    steps = []
+    steps, codes = [], []
     for name in rule.required_subjects:
-        code = catalog.choice_code("subjects", name)
-        evidence = (stated.get(code) or derived.get(code)) if code else None
+        codes += [code for code in _subject_codes(name, catalog) if code not in codes]
+    for code in codes:
+        evidence = stated.get(code) or derived.get(code)
         if evidence is not None:
             steps.append(_step(f"strengthen:{code}", "step_strengthen", {"subject": catalog.label("subjects", code)},
                                "not", evidence))

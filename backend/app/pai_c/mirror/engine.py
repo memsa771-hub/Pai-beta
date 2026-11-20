@@ -199,7 +199,9 @@ class MirrorEngine:
     def _with_weak_subjects(self, entries: list[dict], shown: dict, rows) -> list[dict]:
         """Stated weaknesses plus weak subjects from marks; one entry per subject,
         the student's own words first, the marks kept as `also` evidence."""
-        template, order = mirror_policy()["copy"]["weak_subject"], mirror_policy()["levels"]["order"]
+        policy = mirror_policy()
+        template, grade_template = policy["copy"]["weak_subject"], policy["copy"]["weak_subject_grade"]
+        order = policy["levels"]["order"]
         by_subject = {}
         for entry in entries:
             value = shown[entry["id"]].entry["value"]
@@ -213,7 +215,10 @@ class MirrorEngine:
                     stated["evidence"] = weak["evidence"]
                 continue
             entry = self._entry(weak["ref"], weak["row"], None)
-            entry["text"] = template.format(name=weak["name"], percent=weak["percent"], average=weak["average"])
+            if weak["grade"]:  # no real percent: show the grade the student has, never a converted number
+                entry["text"] = grade_template.format(name=weak["name"], grade=weak["grade"])
+            else:
+                entry["text"] = template.format(name=weak["name"], percent=weak["percent"], average=weak["average"])
             entries.append(entry)
         return entries
 

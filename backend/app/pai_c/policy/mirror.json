@@ -30,7 +30,8 @@
   "copy": {
     "tension.family_vs_goal": "Your family's wish and the field you lean toward point to different fields.",
     "chat_card": "Your Mirror: what PAI knows about you so far.",
-    "weak_subject": "{name}: {percent}% (your average {average}%)"
+    "weak_subject": "{name}: {percent}% (your average {average}%)",
+    "weak_subject_grade": "{name}: grade {grade}, below your other subjects"
   },
   "text": {
     "min_sentences": 3,

@@ -251,3 +251,9 @@ def test_strengthen_step_disappears_when_marks_improve():
     steps = route("electrical_engineering", fsc("pre_engineering", 70),
                   course("Mathematics", 75, "m"), course("Physics", 78, "p"), course("Chemistry", 80, "c"))
     assert "strengthen" not in [s["kind"] for s in steps]
+
+
+def test_strengthen_step_reads_subjects_inside_rule_text():
+    steps = route("computer_science", fsc("pre_engineering", 70),
+                  course("Mathematics", 40, "m"), course("Physics", 78, "p"), course("Chemistry", 80, "c"))
+    assert step(steps, "strengthen:mathematics")["evidence"]["id"] == "course:m"

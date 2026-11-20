@@ -10,13 +10,14 @@ from app.pai_c.policy.controller import load_data
 from app.pai_c.roadmap.engine import marks_percent
 
 
-def _percent(value: dict, grades: dict) -> float | None:
+def _percent(value: dict, grades: dict) -> tuple[float | None, str | None]:
+    """The course's percent, and its grade letter when the percent only stands in for a grade."""
     score = value.get("score") or {}
     percent = marks_percent({"result": score})
     if percent is not None:
-        return percent
+        return percent, None
     grade = str(score.get("grade") or value.get("grade") or "").strip().upper()
-    return grades.get(grade)
+    return grades.get(grade), (grade if grade in grades else None)
 
 
 def _scored(rows: list, policy: dict) -> dict:
@@ -29,9 +30,9 @@ def _scored(rows: list, policy: dict) -> dict:
         if getattr(row, "sensitivity", None) == "restricted":
             continue
         value = entry["value"] if isinstance(entry["value"], dict) else {}
-        percent = _percent(value, policy["grade_percent"])
+        percent, grade = _percent(value, policy["grade_percent"])
         if percent is not None and value.get("name") and value.get("education_id"):
-            by_education.setdefault(str(value["education_id"]), []).append((row, percent))
+            by_education.setdefault(str(value["education_id"]), []).append((row, percent, grade))
     return by_education
 
 
@@ -52,10 +53,10 @@ def weak_subjects(rows: list) -> list[dict]:
     enough = [key for key in _education_order(rows) if len(scored.get(key, ())) >= policy["min_courses"]]
     chosen = enough[0] if enough else max(scored, key=lambda key: len(scored[key]))
     courses = scored[chosen]
-    average = round(sum(percent for _, percent in courses) / len(courses), 1)
+    average = round(sum(course[1] for course in courses) / len(courses), 1)
     relative = len(courses) >= policy["min_courses"]
     catalog, weak = vault_catalog(), []
-    for row, percent in courses:
+    for row, percent, grade in courses:
         if percent < policy["absolute_floor_percent"]:
             rule = "floor"
         elif relative and average - percent >= policy["below_own_average_points"]:
@@ -66,5 +67,5 @@ def weak_subjects(rows: list) -> list[dict]:
         subject = (catalog.choice_code("subjects", value.get("name", ""))
                    or catalog.choice_code("subjects", value.get("normalized_name") or ""))
         weak.append({"ref": entry_ref(row.entry), "subject": subject, "name": value["name"], "percent": percent,
-                     "average": average, "rule": rule, "evidence": row.entry.get("level"), "row": row})
+                     "average": average, "rule": rule, "evidence": row.entry.get("level"), "grade": grade, "row": row})
     return sorted(weak, key=lambda item: item["percent"])

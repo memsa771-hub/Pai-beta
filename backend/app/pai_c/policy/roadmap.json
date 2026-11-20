@@ -48,7 +48,9 @@
   "test_pending_statuses": ["planned", "registered", "booked", "scheduled", "applied"],
   "bridge_course_terms": ["mathematics", "maths", "math", "biology", "physics", "chemistry", "computer science"],
   "manual_level": "stated",
-  "tickable_kinds": ["apply", "bridge", "check", "test"]
+  "tickable_kinds": ["apply", "bridge", "check", "test"],
+  "_informational_note": "Step kinds shown on the route but never named as the chat next step (state.route_next_step): a weakness to work on runs alongside the route, it is not a gate.",
+  "informational_kinds": ["strengthen"]
  },
  "timeline": {
   "_note": "Time estimate (app/pai_c/roadmap/timeline.py; FOUR_FEATURES_SPEC 4.2). Event keys are academic_calendar.json events or tests. tracks: an education level to its calendar track. finish: what a track still sits to finish intermediate; chain events happen in order, each after the one before (a later step's test can follow the exam), and result is the gate the intake waits for but nothing chains after. A current student in details.current_year 1 uses <track>_year_1; a student before intermediate uses <track> while current and <track>_done once it is completed. improve: the exam and result a student below the marks floor sits again; a track with none leaves the step 'date not confirmed'. Steps of other kinds wait for no calendar event (apply goes with the intake).",

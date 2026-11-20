@@ -287,3 +287,14 @@ def test_stated_and_derived_same_subject_merge():
     entries = _area(card, "weaknesses")["entries"]
     assert len(entries) == 1 and entries[0]["text"] == "Maths"
     assert entries[0]["also"] and entries[0]["also"][0].startswith("course:")
+
+
+def test_grade_only_weak_subject_shows_the_grade_not_a_percent():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        education_id = _record(db, ws, "education", {"qualification_name": "O Level", "academic_status": "completed"})
+        for name, grade in {"Mathematics": "A", "Physics": "A", "Chemistry": "D", "Biology": "A"}.items():
+            _record(db, ws, "course", {"education_id": education_id, "name": name, "score": {"grade": grade}})
+        card = MirrorEngine(db).build(ws)
+    texts = [entry["text"] for entry in _area(card, "weaknesses")["entries"]]
+    assert texts == ["Chemistry: grade D, below your other subjects"]

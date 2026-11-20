@@ -173,7 +173,7 @@ def test_item_evidence_renders_labels_not_codes():
 def test_only_spec_item_types_are_cited():
     from app.pai_c.paths.analyzer import policy as analyzer_policy
     allowed = analyzer_policy()["evidence_item_types"]
-    assert set(allowed) == {"interest", "strength", "value", "pressure", "option", "certainty",
+    assert set(allowed) == {"interest", "strength", "weakness", "value", "pressure", "option", "certainty",
                             "family_member", "domicile", "daily_life"}
     with StudentSession() as student, student.factory() as db:
         ws = student.workspace_id
@@ -242,3 +242,13 @@ def test_next_question_never_asks_weaknesses():
     everything["weaknesses"] = {"covered": False, "stale": False}
     assert controller.decide(_state(everything)).topic != "weaknesses"
     assert "weaknesses" not in controller.askable_areas(_state(everything, mentioned_areas=["weaknesses"]))
+
+
+def test_outside_meter_area_never_counts_toward_counselor_thresholds():
+    from app.pai_c.policy.state import first_picture_due
+    three = {area: {"covered": area in ("status", "history", "goals"), "stale": False} for area in PRIORITY}
+    three["weaknesses"] = {"covered": True, "stale": False}
+    assert not first_picture_due(coverage=three, student_count=10, prior_decisions=[], mirror_ready=False)
+    two = {area: {"covered": area in ("status", "history"), "stale": False} for area in PRIORITY}
+    two["weaknesses"] = {"covered": True, "stale": False}
+    assert _state(two)["invite_pending"] is True

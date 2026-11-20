@@ -13,11 +13,17 @@ def _known(area: dict) -> bool:
     return bool(area.get("covered")) and not area.get("stale")
 
 
+def _metered_known(coverage) -> int:
+    """Known areas the meter counts; areas outside it (weaknesses) never move a threshold."""
+    outside = set(load_data("areas_policy.json").get("outside_meter", ()))
+    return sum(_known(area) for key, area in coverage.items() if key not in outside)
+
+
 def first_picture_due(*, coverage, student_count, prior_decisions, mirror_ready):
     """A provisional picture uses evidence coverage, never elapsed turn count.
     Once the Mirror is ready the card is the picture."""
     rules = load_data("guided_table.json")["derived"]
-    known = sum(_known(area) for area in coverage.values())
+    known = _metered_known(coverage)
     return (not mirror_ready
             and not any(row["decision"].get("action") == rules["first_picture_action"] for row in prior_decisions)
             and known >= rules["first_picture_min_covered_areas"]
@@ -72,9 +78,14 @@ def route_next_step(db, workspace_id: str) -> str | None:
     row = RouteDecisionService(db).active(workspace_id)
     if row is None:
         return None
-    done, copy = set(done_keys(row)), load_data("roadmap.json")["copy"]
+    roadmap = load_data("roadmap.json")
+    done, copy = set(done_keys(row)), roadmap["copy"]
+    informational = set(roadmap["steps"].get("informational_kinds", ()))
     for step in row.steps or []:
         template = copy.get(step.get("label_key"))
+        kind = step.get("kind") or str(step.get("key") or "").split(":")[0]
+        if kind in informational:  # Strengthen <subject> informs; it never becomes the next step
+            continue
         if step.get("status") == "done" or step.get("key") in done or not template:
             continue
         values = {key: ", ".join(map(str, value)) if isinstance(value, list) else value
@@ -94,7 +105,7 @@ def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
     policy = load_data("guided_table.json")["derived"]
     data = signals.model_dump()
     previous = prior_decisions[-1]["decision"] if prior_decisions else {}
-    covered = sum(_known(area) for area in coverage.values())
+    covered = _metered_known(coverage)
     by_event = {row["event_id"]: row["decision"] for row in prior_decisions}
     summaries = [student_ordinals.get(row["event_id"], 0) for row in prior_decisions
                  if row["decision"].get("action") == policy["summary_action"]]

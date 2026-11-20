@@ -410,3 +410,16 @@ async def test_a_step_already_closing_the_reply_is_posted_once():
             result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
     assert result.reply == "Those two fields both use maths.\n\n" + step
     assert result.reply.count("Open the Roadmap page") == 1 and result.next_step == step
+
+
+def test_next_step_skips_the_informational_strengthen_step():
+    from app.models import RouteDecision
+    from app.pai_c.policy.state import route_next_step
+    steps = [{"key": "strengthen:mathematics", "kind": "strengthen", "label_key": "step_strengthen",
+              "values": {"subject": "Mathematics"}, "status": "not"},
+             {"key": "test:ecat", "label_key": "step_test", "values": {"name": "ECAT"}, "status": "not"}]
+    with StudentSession() as student, student.factory() as db:
+        db.add(RouteDecision(workspace_id=student.workspace_id, field_key="computer_science", title="Computer Science",
+                             verdict={}, route={}, steps=steps, steps_done=[]))
+        db.commit()
+        assert route_next_step(db, student.workspace_id) == "Take ECAT"
