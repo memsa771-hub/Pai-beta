@@ -5,6 +5,7 @@
     "fields": {
       "interest": "text",
       "strength": "text",
+      "weakness": "text",
       "value": "text",
       "pressure": "text",
       "option": "text",

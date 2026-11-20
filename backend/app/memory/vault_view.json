@@ -181,6 +181,13 @@
         ],
         "join": " — "
       },
+      "weakness": {
+        "fields": [
+          "text",
+          "basis"
+        ],
+        "join": " — "
+      },
       "interest": {
         "fields": [
           "text",

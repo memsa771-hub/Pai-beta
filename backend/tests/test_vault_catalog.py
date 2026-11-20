@@ -38,7 +38,7 @@ def test_every_type_is_valid():
     assert all(t.key in RECORD_SPECS for t in catalog.types("record"))
     assert {t.key for t in catalog.types("item")} == {
         "interest", "strength", "value", "pressure", "option", "myth", "certainty",
-        "family_member", "domicile", "quota", "daily_life"}
+        "family_member", "domicile", "quota", "daily_life", "weakness"}
     assert catalog.type("nope") is None
     assert catalog.type("domicile").identity == []
     assert catalog.type("family_member").identity == ["relation", "name"]
@@ -149,3 +149,27 @@ def test_clashing_choice_wording_is_rejected():
     duplicate = {"choices": {"tests": [_choice("sat", "SAT"), _choice("sat", "SAT again")]}, "types": []}
     with pytest.raises(ValueError, match="tests"):
         VaultCatalog.from_dict(duplicate)
+
+
+def test_weakness_item_type():
+    spec = vault_catalog().type("weakness")
+    assert spec.storage == "item" and "chat" in spec.inputs
+    assert spec.freshness_days == 180 and spec.conflict == "latest_wins"
+    assert spec.identity == ["text"]
+    assert spec.choice_fields == {"kind": "weakness_kinds", "subject": "subjects"}
+    validate_schema_instance(spec.schema, {"text": "Mathematics", "basis": "Says maths is hard",
+                                           "kind": "subject", "subject": "mathematics"})
+    with pytest.raises(SchemaValidationError):
+        validate_schema_instance(spec.schema, {"text": "Lazy", "mood": "x"})
+    with pytest.raises(SchemaValidationError):
+        validate_schema_instance(spec.schema, {"text": "Lazy", "kind": "personality"})
+
+
+def test_subjects_choice_list_matches_synonyms():
+    catalog = vault_catalog()
+    assert catalog.choice_code("subjects", "Maths") == "mathematics"
+    assert catalog.choice_code("subjects", "Physics") == "physics"
+    assert catalog.choice_code("subjects", "Computer") == "computer_science"
+    assert catalog.choice_code("subjects", "English") == "english"
+    olevel = {c.code for c in catalog.choices("o_level_subjects")}
+    assert {"mathematics", "physics", "chemistry", "biology", "urdu"} <= olevel & {c.code for c in catalog.choices("subjects")}

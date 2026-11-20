@@ -969,6 +969,179 @@
     ]
    }
   ],
+  "weakness_kinds": [
+   {
+    "code": "subject",
+    "label": "Subject"
+   },
+   {
+    "code": "language",
+    "label": "Language"
+   },
+   {
+    "code": "study_skill",
+    "label": "Study skill"
+   },
+   {
+    "code": "test_skill",
+    "label": "Test skill"
+   },
+   {
+    "code": "habit",
+    "label": "Habit"
+   }
+  ],
+  "subjects": [
+   {
+    "code": "mathematics",
+    "label": "Mathematics",
+    "synonyms": [
+     "maths",
+     "math",
+     "riazi",
+     "general mathematics"
+    ]
+   },
+   {
+    "code": "physics",
+    "label": "Physics",
+    "synonyms": [
+     "phy"
+    ]
+   },
+   {
+    "code": "chemistry",
+    "label": "Chemistry",
+    "synonyms": [
+     "chem"
+    ]
+   },
+   {
+    "code": "biology",
+    "label": "Biology",
+    "synonyms": [
+     "bio"
+    ]
+   },
+   {
+    "code": "computer_science",
+    "label": "Computer Science",
+    "synonyms": [
+     "computer",
+     "CS",
+     "computer studies",
+     "ICT"
+    ]
+   },
+   {
+    "code": "english",
+    "label": "English",
+    "synonyms": [
+     "english language",
+     "english compulsory",
+     "english literature"
+    ]
+   },
+   {
+    "code": "urdu",
+    "label": "Urdu",
+    "synonyms": [
+     "urdu compulsory"
+    ]
+   },
+   {
+    "code": "islamiyat",
+    "label": "Islamiyat",
+    "synonyms": [
+     "islamic studies",
+     "islamiat"
+    ]
+   },
+   {
+    "code": "pakistan_studies",
+    "label": "Pakistan Studies",
+    "synonyms": [
+     "pak studies",
+     "pak study",
+     "mutala pakistan"
+    ]
+   },
+   {
+    "code": "general_science",
+    "label": "General Science",
+    "synonyms": [
+     "science"
+    ]
+   },
+   {
+    "code": "statistics",
+    "label": "Statistics",
+    "synonyms": [
+     "stats"
+    ]
+   },
+   {
+    "code": "economics",
+    "label": "Economics",
+    "synonyms": [
+     "eco"
+    ]
+   },
+   {
+    "code": "accounting",
+    "label": "Accounting",
+    "synonyms": [
+     "accounts",
+     "principles of accounting"
+    ]
+   },
+   {
+    "code": "business",
+    "label": "Business",
+    "synonyms": [
+     "business studies",
+     "commerce"
+    ]
+   },
+   {
+    "code": "history",
+    "label": "History",
+    "synonyms": []
+   },
+   {
+    "code": "geography",
+    "label": "Geography",
+    "synonyms": []
+   },
+   {
+    "code": "psychology",
+    "label": "Psychology",
+    "synonyms": []
+   },
+   {
+    "code": "sociology",
+    "label": "Sociology",
+    "synonyms": []
+   },
+   {
+    "code": "civics",
+    "label": "Civics",
+    "synonyms": []
+   },
+   {
+    "code": "education",
+    "label": "Education",
+    "synonyms": []
+   },
+   {
+    "code": "health_physical_education",
+    "label": "Health and Physical Education",
+    "synonyms": [
+     "physical education",
+     "PE"
+    ]
+   }
+  ],
   "countries": [
    {
     "code": "pk",
@@ -3271,6 +3444,61 @@
    "identity": [
     "text"
    ]
+  },
+  {
+   "key": "weakness",
+   "label": "Area to work on",
+   "storage": "item",
+   "shown_on": "story",
+   "inputs": [
+    "chat",
+    "story"
+   ],
+   "sensitivity": "normal",
+   "conflict": "latest_wins",
+   "freshness_days": 180,
+   "version": 1,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "basis": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "subject",
+       "language",
+       "study_skill",
+       "test_skill",
+       "habit"
+      ]
+     },
+     "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "additionalProperties": false
+   },
+   "identity": [
+    "text"
+   ],
+   "choice_fields": {
+    "kind": "weakness_kinds",
+    "subject": "subjects"
+   }
   },
   {
    "key": "value",
