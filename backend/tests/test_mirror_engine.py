@@ -234,3 +234,56 @@ def test_ready_needs_the_current_education_a_goal_and_two_interests_not_a_second
         card = MirrorEngine(db).build(ws)
         assert card["ready"] is True
         assert "history" in {u["area"] for u in card["unknowns"]}  # the past is still asked for, it just never gates the card
+
+
+def _courses(db, ws, education_id, marks):
+    for name, percent in marks.items():
+        _record(db, ws, "course", {"education_id": education_id, "name": name, "score": {"percentage": percent}})
+
+
+def test_weaknesses_area_absent_without_entries():
+    with StudentSession() as student, student.factory() as db:
+        _education(db, student.workspace_id)
+        card = MirrorEngine(db).build(student.workspace_id)
+    assert "weaknesses" not in {area["key"] for area in card["areas"]}
+
+
+def test_priority_areas_carry_meter_true():
+    with StudentSession() as student, student.factory() as db:
+        _education(db, student.workspace_id)
+        card = MirrorEngine(db).build(student.workspace_id)
+    assert [area["key"] for area in card["areas"]] == PRIORITY
+    assert all(area["meter"] is True for area in card["areas"])
+
+
+def test_weaknesses_area_from_stated_item():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _education(db, ws)
+        _item(db, ws, "weakness", {"text": "Spoken English", "kind": "language"})
+        card = MirrorEngine(db).build(ws)
+    area = _area(card, "weaknesses")
+    assert area["meter"] is False and area["label"] == "Areas to work on"
+    assert [entry["text"] for entry in area["entries"]] == ["Spoken English"]
+    assert card["areas"][-1]["key"] == "weaknesses"
+
+
+def test_weaknesses_area_from_marks():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _courses(db, ws, _education(db, ws), {"Mathematics": 45, "Physics": 78, "Chemistry": 80, "English": 76})
+        card = MirrorEngine(db).build(ws)
+    entries = _area(card, "weaknesses")["entries"]
+    assert len(entries) == 1 and entries[0]["text"].startswith("Mathematics: 45%")
+    assert entries[0]["id"].startswith("course:")
+
+
+def test_stated_and_derived_same_subject_merge():
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        _courses(db, ws, _education(db, ws), {"Mathematics": 45, "Physics": 78, "Chemistry": 80})
+        _item(db, ws, "weakness", {"text": "Maths", "kind": "subject", "subject": "mathematics"})
+        card = MirrorEngine(db).build(ws)
+    entries = _area(card, "weaknesses")["entries"]
+    assert len(entries) == 1 and entries[0]["text"] == "Maths"
+    assert entries[0]["also"] and entries[0]["also"][0].startswith("course:")

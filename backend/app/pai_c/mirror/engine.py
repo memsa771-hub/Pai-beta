@@ -24,6 +24,7 @@ from app.pai_c.memory import MemoryService, entry_ref, vault_catalog
 from app.pai_c.paths.fields import current_education, study_fields
 from app.pai_c.policy.controller import at_path, load_data
 from app.pai_c.roadmap.engine import education_line, marks_percent, student_standing
+from app.pai_c.understanding.weak_subjects import weak_subjects
 
 _SENTENCE_END = re.compile(r"(?<=[.!])\s+(?=\S)")
 
@@ -153,7 +154,17 @@ class MirrorEngine:
                     if key in policy["education_areas"] and current_ref in refs else [])
             areas.append({"key": key, "label": areas_policy["labels"].get(key, key),
                           "level": self._level(known, entries), "entries": entries, "bars": bars,
-                          "tension": []})
+                          "tension": [], "meter": True})
+        for key in areas_policy.get("outside_meter", ()):
+            row = coverage.get(key, {})
+            refs = [ref for ref in row.get("entry_ids", ()) if ref in shown and not shown[ref].entry["stale"]]
+            entries = [self._entry(ref, shown[ref], None) for ref in refs]
+            if key == "weaknesses":
+                entries = self._with_weak_subjects(entries, shown, rows)
+            if entries:  # outside the meter: shown only when there is something to show
+                areas.append({"key": key, "label": areas_policy["labels"].get(key, key),
+                              "level": self._level(True, entries), "entries": entries, "bars": [],
+                              "tension": [], "meter": False})
         self._tensions(areas, shown)
 
         card = {"header": {"name": self._name(rows), "education_line": line},
@@ -184,6 +195,27 @@ class MirrorEngine:
             text = entry["display"] or entry["label"]
         return {"id": ref, "text": text, "evidence": entry["level"], "source_label": source_label(row),
                 "observed_at": entry["observed_at"]}
+
+    def _with_weak_subjects(self, entries: list[dict], shown: dict, rows) -> list[dict]:
+        """Stated weaknesses plus weak subjects from marks; one entry per subject,
+        the student's own words first, the marks kept as `also` evidence."""
+        template, order = mirror_policy()["copy"]["weak_subject"], mirror_policy()["levels"]["order"]
+        by_subject = {}
+        for entry in entries:
+            value = shown[entry["id"]].entry["value"]
+            if isinstance(value, dict) and value.get("subject"):
+                by_subject[value["subject"]] = entry
+        for weak in weak_subjects(rows):
+            stated = by_subject.get(weak["subject"]) if weak["subject"] else None
+            if stated is not None:
+                stated.setdefault("also", []).append(weak["ref"])
+                if order.index(weak["evidence"]) > order.index(stated["evidence"]):
+                    stated["evidence"] = weak["evidence"]
+                continue
+            entry = self._entry(weak["ref"], weak["row"], None)
+            entry["text"] = template.format(name=weak["name"], percent=weak["percent"], average=weak["average"])
+            entries.append(entry)
+        return entries
 
     @staticmethod
     def _education_line(standing) -> dict | None:
