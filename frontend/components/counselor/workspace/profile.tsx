@@ -32,7 +32,7 @@ const load = async () => {
 type Tab = "details" | "background";
 
 export function heatmapAreas(coverage: LivingPicture["coverage"]): HeatmapArea[] {
-  return Object.entries(copy.areas).map(([key, label]) => {
+  return Object.entries(copy.areas).filter(([key]) => !layout.outsideMeter.includes(key)).map(([key, label]) => {
     const area = coverage[key];
     const count = area?.item_count || 0;
     return { key, label, icon: areaIcon(key), count, level: count ? evidenceLevel(area?.evidence || "stated") : "none" };
@@ -299,6 +299,7 @@ export function LivingProfile({
                   const cards = vault.story.filter((card) => areaOf(card.type) === area)
                     .map((card) => ({ ...card, entries: card.entries.filter(visible) }));
                   const types = cards.map((card) => typeOf(card.type)).filter((t): t is VaultCatalogType => t !== null);
+                  if (layout.outsideMeter.includes(area) && !cards.some((card) => card.entries.length)) return null;
                   return <StoryArea key={area} area={area} cards={cards} types={types} onChat={onChat} onOpen={openEntry} onSaved={refresh} />;
                 })}
               </div>

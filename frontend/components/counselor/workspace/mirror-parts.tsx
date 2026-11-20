@@ -50,7 +50,8 @@ export function LevelBar({ level, tone }: { level: number; tone: keyof typeof to
  * a strip of the ten areas, and the few lines PAI wrote. */
 export function MirrorHero({ card, updated }: { card: MirrorCard; updated: string }) {
   const name = card.header.name;
-  const known = card.areas.filter((area) => area.level > 0).length;
+  const metered = card.areas.filter((area) => area.meter !== false);
+  const known = metered.filter((area) => area.level > 0).length;
   return (
     <header className={cn(CARD, "relative min-w-0 overflow-hidden p-5 sm:p-7")}>
       <div className="relative flex min-w-0 items-center gap-4">
@@ -65,9 +66,9 @@ export function MirrorHero({ card, updated }: { card: MirrorCard; updated: strin
       </div>
       <div className="relative mt-4 flex flex-wrap items-center gap-2">
         {updated && <StatChip size="sm" icon={CalendarClock}>{fill(t.updated, { date: updated })}</StatChip>}
-        <StatChip size="sm" tone="blue">{fill(t.known, { known, total: card.areas.length })}</StatChip>
+        <StatChip size="sm" tone="blue">{fill(t.known, { known, total: metered.length })}</StatChip>
         <span aria-hidden className="flex gap-1">
-          {card.areas.map((area) => (
+          {metered.map((area) => (
             <span key={area.key} title={area.label}
               className={cn("size-2.5 rounded-full", area.level ? toneClass[areaTone(area.key)].bar : "bg-muted", area.level === 1 && "opacity-50")} />
           ))}

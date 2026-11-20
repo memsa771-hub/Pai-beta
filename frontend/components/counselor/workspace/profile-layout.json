@@ -16,6 +16,10 @@
       "icon": "lightbulb",
       "tone": "amber"
     },
+    "weaknesses": {
+      "icon": "target",
+      "tone": "rose"
+    },
     "family_social": {
       "icon": "users",
       "tone": "teal"
@@ -231,6 +235,7 @@
   "story": {
     "interests": "What you enjoy doing, in class and outside it.",
     "strengths": "What you are good at, and how you know it.",
+    "weaknesses": "Where extra work will pay off, and how we know.",
     "values": "What matters to you in work and in life.",
     "family_social": "The people whose opinion matters, and what they hope for you.",
     "pressures": "Money, time and expectations: what weighs on your choice.",
@@ -252,6 +257,9 @@
       "work_experience",
       "language_proficiency",
       "certification"
+    ],
+    "weaknesses": [
+      "weakness"
     ],
     "values": [
       "value",
@@ -278,5 +286,9 @@
       "certainty"
     ]
   },
-  "storyFallbackArea": "options"
+  "storyFallbackArea": "options",
+  "_outsideMeterNote": "Areas outside the completeness meter (backend areas_policy.json outside_meter): never a heatmap cell, and a story area drawn only when it holds an entry.",
+  "outsideMeter": [
+    "weaknesses"
+  ]
 }

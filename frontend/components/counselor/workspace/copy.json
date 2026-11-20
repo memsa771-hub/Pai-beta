@@ -129,6 +129,7 @@
     "history": "Education & experience",
     "interests": "Interests",
     "strengths": "Strengths",
+    "weaknesses": "Areas to work on",
     "family_social": "Family",
     "values": "Values",
     "pressures": "Pressures & limits",
@@ -792,9 +793,14 @@
     "chatOpen": "Open your Mirror",
     "templates": {
       "tension.family_vs_goal": "Your family's wish and the field you lean toward point to different fields.",
-      "chat_card": "Your Mirror: what PAI knows about you so far."
+      "chat_card": "Your Mirror: what PAI knows about you so far.",
+      "weak_subject": "{name}: {percent}% (your average {average}%)"
     },
     "questions": {
+      "topic_text.weaknesses": {
+        "question": "Which subject or study skill takes you the most effort?",
+        "topic": "I want to tell you which subjects or study skills feel hard for me."
+      },
       "topic_text.history": {
         "question": "What have you studied so far, and what marks did you get?",
         "topic": "I want to tell you about my education and my marks."

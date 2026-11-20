@@ -186,3 +186,14 @@ it("gives every Mirror action a 44px target", async () => {
     navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
   expect(within(screen.getByRole("region", { name: "Your Mirror" })).getByRole("button", { name: "Open your Mirror" }).className).toMatch(tap);
 });
+
+it("shows Areas to work on without counting it in the areas known", async () => {
+  const card = structuredClone(mirrorCard);
+  card.areas.push({ key: "weaknesses", label: "Areas to work on", level: 1, bars: [], tension: [], meter: false,
+    entries: [{ id: "item:w1", text: "Spoken English", evidence: "stated", source_label: "Chat", observed_at: null }] });
+  vi.mocked(workspaceApi.getMirror).mockResolvedValue(card);
+  render(<Mirror onChat={vi.fn()} />);
+  const area = await tile("Areas to work on");
+  expect(within(area).getByText("Spoken English")).toBeTruthy();
+  expect(screen.getByText("7 of 10 areas known")).toBeTruthy();
+});

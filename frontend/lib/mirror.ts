@@ -11,6 +11,8 @@ export type MirrorEntry = {
   evidence: VaultLevel;
   source_label: string;
   observed_at: string | null;
+  /** Other entries saying the same thing (a weak subject's marks behind the student's own words). */
+  also?: string[];
 };
 
 export type MirrorTension = { a_id: string; b_id: string; note_key: string };
@@ -24,6 +26,8 @@ export type MirrorArea = {
   /** Per-subject marks of the current education record, when it has them. */
   bars?: { label: string; percent: number }[];
   tension: MirrorTension[];
+  /** false for an area outside the completeness meter (Areas to work on): shown, never counted. */
+  meter?: boolean;
 };
 
 export type MirrorUnknown = { area: string; label: string; question_key: string | null; priority: number };

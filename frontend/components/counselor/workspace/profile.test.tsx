@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-li
 import { LivingProfile, CoverageHeatmap, CertaintyChart } from "./profile";
 import { EvidenceBadge, vaultBadgeLabel } from "@/components/pai";
 import { workspaceApi } from "@/lib/api";
-import { picture, vault, vaultCatalog } from "@/tests/fixtures/counselor";
+import { entry, picture, vault, vaultCatalog } from "@/tests/fixtures/counselor";
 import type { VaultConflict } from "@/lib/vault";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -430,7 +430,8 @@ it("places every story type the catalog has in one of the seven areas", () => {
   const mapped = Object.values(layout.storyAreas).flat();
   expect(story.length).toBeGreaterThan(0);
   for (const { key } of story) expect(mapped, key).toContain(key);
-  expect(Object.keys(layout.storyAreas)).toEqual(["interests", "strengths", "values", "family_social", "pressures", "goals", "options"]);
+  expect(Object.keys(layout.storyAreas)).toEqual(["interests", "strengths", "weaknesses", "values", "family_social", "pressures", "goals", "options"]);
+  expect(areaOf("weakness")).toBe("weaknesses");
   expect(areaOf("not_in_data_yet")).toBe(layout.storyFallbackArea);
 });
 
@@ -502,4 +503,21 @@ it("audit #4: a structured entry reads in the Vault's words, never its raw field
 it("the header ring is the completeness meter (areas known of ten), not the basics list", async () => {
   setup({ ...vault, completeness: { known: 2, total: 10, unknowns: [] } });
   expect(await screen.findByRole("img", { name: "20% complete" })).toBeTruthy();
+});
+
+it("shows Areas to work on in the story only when it holds an entry", async () => {
+  window.history.replaceState({}, "", "/?tab=background");
+  const weakness = { type: "weakness", label: "Area to work on", rich: false, next_step: null, entries: [
+    entry({ kind: "item", type: "weakness", id: "w1", value: { text: "Spoken English", kind: "language" },
+      display: "Spoken English", label: "Area to work on" }),
+  ] };
+  setup({ ...vault, story: [...vault.story, weakness] });
+  const region = await screen.findByRole("region", { name: "Your story" });
+  expect(within(region).getByRole("heading", { level: 3, name: "Areas to work on" })).toBeTruthy();
+  expect(within(region).getByText("Spoken English")).toBeTruthy();
+});
+
+it("keeps the same areas outside the meter as the backend", () => {
+  const policy = JSON.parse(readFileSync(resolve(__dirname, "../../../../backend/app/pai_c/policy/areas_policy.json"), "utf8"));
+  expect(layout.outsideMeter).toEqual(policy.outside_meter);
 });
