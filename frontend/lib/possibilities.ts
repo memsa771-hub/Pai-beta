@@ -1,10 +1,11 @@
 import type { VaultLevel } from './vault';
 /** One requirement of a path checked against the student: have (green),
- * partial (amber), blocker (red) or unknown (grey). Known verdicts carry the
+ * partial (amber), blocker (red), work (amber: the path demands something the
+ * student is weak in; never blocks) or unknown (grey). Known verdicts carry the
  * student's own words; the server turns anything uncited into unknown. */
 export type FitItem = {
   label: string;
-  status: 'have' | 'partial' | 'blocker' | 'unknown';
+  status: 'have' | 'partial' | 'blocker' | 'unknown' | 'work';
   note: string;
   evidence: string[];
 };

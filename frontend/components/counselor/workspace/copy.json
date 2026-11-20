@@ -64,7 +64,8 @@
     "have": "You have this",
     "partial": "Partly there",
     "blocker": "In the way",
-    "unknown": "Not known yet"
+    "unknown": "Not known yet",
+    "work": "Needs work"
   },
   "fitFrom": "From what you said",
   "whySource": "Source",
@@ -555,7 +556,7 @@
       "dismissed": "Not for me"
     },
     "statusLabel": "Status",
-    "fitDots": "{have} you have, {partial} partly, {blocker} in the way, {unknown} not known yet",
+    "fitDots": "{have} you have, {partial} partly, {blocker} in the way, {work} need work, {unknown} not known yet",
     "nextLabel": "Your next step",
     "nextOpen": "Open {view}",
     "recommends": "PAI recommends",

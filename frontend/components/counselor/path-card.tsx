@@ -1,5 +1,5 @@
 'use client';
-import { CircleCheck, CircleDashed, CircleHelp, CircleX, Compass, ExternalLink, Quote, type LucideIcon } from 'lucide-react';
+import { CircleCheck, CircleDashed, CircleAlert, CircleHelp, CircleX, Compass, ExternalLink, Quote, type LucideIcon } from 'lucide-react';
 import { EvidenceBadge, StatChip, toneClass, toneFor, vaultBadgeLabel, type Tone } from '@/components/pai';
 import type { FitItem, PathEvidence, StudyField } from '@/lib/possibilities';
 import type { VaultLevel } from '@/lib/vault';
@@ -72,6 +72,7 @@ const FIT: Record<FitItem['status'], { icon: LucideIcon; className: string }> = 
   partial: { icon: CircleDashed, className: 'text-warning' },
   blocker: { icon: CircleX, className: 'text-danger' },
   unknown: { icon: CircleHelp, className: 'text-muted-foreground/70' },
+  work: { icon: CircleAlert, className: 'text-warning' },
 };
 
 /** How a path fits the student, one requirement per row. Detailed rows add
@@ -107,7 +108,7 @@ export function FitList({ items, detailed = false, limit }: { items: FitItem[]; 
 export const initials = (title: string) => title.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 
 const DOT: Record<FitItem['status'], string> = {
-  have: 'bg-success', partial: 'bg-warning', blocker: 'bg-danger', unknown: 'bg-muted-foreground/30',
+  have: 'bg-success', partial: 'bg-warning', blocker: 'bg-danger', unknown: 'bg-muted-foreground/30', work: 'bg-warning',
 };
 
 /** A path's fit at a glance: one dot per requirement, read out as counts. */
@@ -115,7 +116,7 @@ export function FitDots({ items, summary }: { items: FitItem[]; summary: string 
   if (!items.length) return null;
   const count = (status: FitItem['status']) => String(items.filter((item) => item.status === status).length);
   const label = summary.replace('{have}', count('have')).replace('{partial}', count('partial'))
-    .replace('{blocker}', count('blocker')).replace('{unknown}', count('unknown'));
+    .replace('{blocker}', count('blocker')).replace('{work}', count('work')).replace('{unknown}', count('unknown'));
   return (
     <span role="img" aria-label={label} title={label} className="inline-flex items-center gap-1">
       {items.map((item, i) => <span key={i} className={cn('size-2 rounded-full', DOT[item.status] || DOT.unknown)} />)}

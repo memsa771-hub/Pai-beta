@@ -46,7 +46,7 @@ it("lists paths with a fit summary and shows each verdict with the student's wor
   render(<Paths onOpen={vi.fn()} />);
   const row = (await screen.findByText("Practical design")).closest("li")!;
   expect(row.querySelector('[role="img"]')?.getAttribute("aria-label"))
-    .toBe("1 you have, 1 partly, 0 in the way, 1 not known yet");
+    .toBe("1 you have, 1 partly, 0 in the way, 0 need work, 1 not known yet");
   vi.mocked(workspaceApi.getPath).mockResolvedValue(pathResult);
   cleanup();
   render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);

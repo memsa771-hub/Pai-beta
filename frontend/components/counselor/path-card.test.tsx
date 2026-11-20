@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { PathCardView } from './path-card';
+import { FitDots, FitList, PathCardView } from './path-card';
+import copy from './workspace/copy.json';
 
 afterEach(cleanup);
 
@@ -39,4 +40,14 @@ it('shows a cited field-note fact as a source link beside the reason', () => {
   const link = screen.getByRole('link', { name: /pec\.org\.pk/ });
   expect(link.getAttribute('href')).toBe('https://www.pec.org.pk/demand');
   expect(reason.textContent).toContain('Source');
+});
+
+it('shows needs work as its own verdict, in words and an amber dot', () => {
+  const have = { label: 'Hands-on skill', status: 'have' as const, note: '', evidence: ['Repairs phones'] };
+  const work = { label: 'Maths', status: 'work' as const, note: 'Needs strong maths', evidence: ['Says maths is hard'] };
+  render(<div><FitList detailed items={[have, work]} /><FitDots items={[have, work]} summary={copy.overview.fitDots} /></div>);
+  expect(screen.getByText('Needs work')).toBeTruthy();
+  const dots = screen.getByRole('img');
+  expect(dots.getAttribute('aria-label')).toBe('1 you have, 0 partly, 0 in the way, 1 need work, 0 not known yet');
+  expect(dots.querySelectorAll('span')[1].className).toContain('bg-warning');
 });
