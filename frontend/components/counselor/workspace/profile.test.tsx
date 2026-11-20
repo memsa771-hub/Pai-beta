@@ -368,10 +368,10 @@ it("builds Background from the Vault story, and adds a story item", async () => 
   expect(await screen.findByRole("heading", { name: "Your story" })).toBeTruthy();
   // The Mirror has its own page now; Background holds no Mirror panel.
   expect(screen.queryByRole("heading", { name: "How PAI sees you" })).toBeNull();
-  // The seven story areas, never one card per Vault type.
+  // The eight story areas, never one card per Vault type; Areas to work on shows even when empty, so it can be added to.
   const areas = within(screen.getByRole("region", { name: "Your story" })).getAllByRole("heading", { level: 3 });
   expect(areas.map((h) => h.textContent)).toEqual(
-    ["Interests", "Strengths", "Values", "Family", "Pressures & limits", "Goals & whose wish", "Options & myths"]);
+    ["Interests", "Strengths", "Areas to work on", "Values", "Family", "Pressures & limits", "Goals & whose wish", "Options & myths"]);
   expect(screen.getByText("What you enjoy doing, in class and outside it.")).toBeTruthy();
   expect(document.body.textContent).toContain("Financial security");
   expect(screen.getByRole("button", { name: /^Fixing things/ }).textContent).toContain("Stated");
@@ -505,7 +505,7 @@ it("the header ring is the completeness meter (areas known of ten), not the basi
   expect(await screen.findByRole("img", { name: "20% complete" })).toBeTruthy();
 });
 
-it("shows Areas to work on in the story only when it holds an entry", async () => {
+it("shows Areas to work on in the story with its entries", async () => {
   window.history.replaceState({}, "", "/?tab=background");
   const weakness = { type: "weakness", label: "Area to work on", rich: false, next_step: null, entries: [
     entry({ kind: "item", type: "weakness", id: "w1", value: { text: "Spoken English", kind: "language" },

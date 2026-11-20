@@ -287,7 +287,7 @@
     ]
   },
   "storyFallbackArea": "options",
-  "_outsideMeterNote": "Areas outside the completeness meter (backend areas_policy.json outside_meter): never a heatmap cell, and a story area drawn only when it holds an entry.",
+  "_outsideMeterNote": "Areas outside the completeness meter (backend areas_policy.json outside_meter): never a heatmap cell; the story card still shows, so the student can add to it.",
   "outsideMeter": [
     "weaknesses"
   ]

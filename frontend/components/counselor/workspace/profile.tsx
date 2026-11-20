@@ -299,7 +299,6 @@ export function LivingProfile({
                   const cards = vault.story.filter((card) => areaOf(card.type) === area)
                     .map((card) => ({ ...card, entries: card.entries.filter(visible) }));
                   const types = cards.map((card) => typeOf(card.type)).filter((t): t is VaultCatalogType => t !== null);
-                  if (layout.outsideMeter.includes(area) && !cards.some((card) => card.entries.length)) return null;
                   return <StoryArea key={area} area={area} cards={cards} types={types} onChat={onChat} onOpen={openEntry} onSaved={refresh} />;
                 })}
               </div>
