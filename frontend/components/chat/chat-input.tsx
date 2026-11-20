@@ -174,7 +174,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], draft, onD
     setPendingFiles([]);
     setShowMentions(false);
     // Height resets via the layout effect when `message` becomes ''.
-    textareaRef.current?.blur();
+    // Keep the cursor in the box (also after clicking send) so the next
+    // message can be typed straight away.
+    textareaRef.current?.focus();
   };
 
   const insertMention = (mentionText: string) => {
