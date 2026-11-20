@@ -155,7 +155,7 @@ def _subject_codes(text: str, catalog) -> list[str]:
     """Subject codes a required-subjects text names: the whole text as one
     subject, else every subject whose label or a synonym of 4+ letters stands
     in it as a word ("Mathematics (else deficiency ...)", "Physics/Chemistry/Maths ...")."""
-    from app.memory.catalog import norm
+    from app.pai_c.memory import norm
     code = catalog.choice_code("subjects", text)
     if code:
         return [code]
