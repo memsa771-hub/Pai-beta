@@ -196,3 +196,26 @@ def test_live_golden_rules_are_in_the_prompt():
                  "Two pressures in one message are two items",
                  "that word in English is the strength's text"):
         assert line in prompt, line
+
+
+@pytest.mark.asyncio
+async def test_inferred_weakness_is_dropped():
+    state = await _run("maths ka paper hamesha mushkil lagta hai", [
+        _proposal("vault_item", "weakness", {"text": "Mathematics"}, "maths ka paper hamesha mushkil lagta hai",
+                  inferred=True)])
+    assert "weakness" not in state.items
+
+
+@pytest.mark.asyncio
+async def test_stated_weakness_is_kept():
+    state = await _run("maths mein kamzor hoon", [
+        _proposal("vault_item", "weakness",
+                  {"text": "Mathematics", "basis": "Says they are weak in maths", "kind": "subject",
+                   "subject": "mathematics"}, "maths mein kamzor hoon")])
+    assert state.items["weakness"].value["text"] == "Mathematics"
+
+
+def test_extractor_prompt_has_weakness_rule():
+    prompt = extractor.SYSTEM_PROMPT
+    for line in ("Weaknesses:", "Never inferred", '"biology acha nahi lagta"', "Teacher says physics is weak"):
+        assert line in prompt, line

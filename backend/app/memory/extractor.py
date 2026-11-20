@@ -696,6 +696,9 @@ def _validate(raw: dict, turn, allowed_vault_keys: set[str],
             validate_schema_instance(spec.schema, value)
         except SchemaValidationError as exc:
             return drop(f"{key} item invalid: {exc}")
+        if key == "weakness" and evidence.get("inferred"):
+            # A weakness is only ever what the student said; PAI never guesses one.
+            return drop("inferred weakness")
         if (evidence.get("inferred") and key == "family_member" and value.get("wish")
                 and isinstance(attribution, dict) and attribution.get("stated_field") == "wish"):
             # The extractor says the student stated this person's wish; it is

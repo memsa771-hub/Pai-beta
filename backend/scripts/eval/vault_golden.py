@@ -24,7 +24,7 @@ FACETS = {
     "family_member": "core", "domicile": "core", "quota": "core",
     "interest": "story", "experience": "story", "skill": "story", "strength": "story",
     "value": "story", "pressure": "story", "goal": "story", "option": "story",
-    "myth": "story", "certainty": "story",
+    "myth": "story", "certainty": "story", "weakness": "story",
 }
 
 _EXPERIENCE_KINDS = ("activity", "project", "achievement", "work_experience",
@@ -243,7 +243,7 @@ def _budget_amount(budget: dict):
 def _item_facet(item_type: str, value: dict):
     """A Vault item as a facet. A choice field reads back as its label and
     keeps its `code`, so a case can check the coding as well as the meaning."""
-    if item_type in ("interest", "strength", "value", "pressure", "option", "myth"):
+    if item_type in ("interest", "strength", "weakness", "value", "pressure", "option", "myth"):
         return _facet(item_type, **value)
     if item_type == "certainty":
         return _facet("certainty", value=value.get("score"), about=value.get("about"))

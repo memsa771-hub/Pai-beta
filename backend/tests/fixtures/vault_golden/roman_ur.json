@@ -159,5 +159,48 @@
     "must_not": [
       {"facet": "goal", "match": {"text": ["doctor", "medicine", "mbbs"]}, "why": "becoming a doctor was a past goal the student gave up"}
     ]
+  },
+  {
+    "id": "ru-weakness-stated",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "A weakness the student states about a subject is a weakness item in English.",
+    "turns": [
+      "Main FSc pre-engineering first year mein hoon.",
+      "Maths mein kaafi kamzor hoon, numericals samajh nahi aate."
+    ],
+    "expected": [
+      {"facet": "weakness", "match": {"text": ["math", "mathematics", "numerical"]}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-weakness-teacher-says",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "What a teacher says about the student is kept as a stated weakness with who said it.",
+    "turns": [
+      "Hamare physics wale sir kehte hain meri physics kamzor hai."
+    ],
+    "expected": [
+      {"facet": "weakness", "match": {"text": "physics"}}
+    ],
+    "must_not": []
+  },
+  {
+    "id": "ru-dislike-is-not-weakness",
+    "language": "roman_ur",
+    "synthetic": true,
+    "description": "A dislike alone is not a weakness: liking and ability differ.",
+    "turns": [
+      "Main Multan mein rehti hoon.",
+      "Biology acha nahi lagta, lekin marks theek aa jate hain."
+    ],
+    "expected": [
+      {"facet": "city", "match": {"value": "Multan"}}
+    ],
+    "must_not": [
+      {"facet": "weakness", "match": {"text": "biology"}, "why": "a dislike with fine marks is not a weakness"}
+    ]
   }
 ]
