@@ -20,7 +20,12 @@
   ],
   "only_if_mentioned": [
     "values",
-    "strengths"
+    "strengths",
+    "weaknesses"
+  ],
+  "_outside_meter_note": "Areas shown on the Mirror only when they have entries; never counted in known/total, never an unknown, never asked for on their own (they are not in priority).",
+  "outside_meter": [
+    "weaknesses"
   ],
   "sensitive": {
     "family_social": {
@@ -40,6 +45,7 @@
     "family_social": "what their family wants them to study",
     "values": "what matters most to them when they choose a field of study",
     "strengths": "which subjects or study tasks they do well in",
+    "weaknesses": "which subjects or study skills feel hard for them",
     "pressures": "their budget range for study and whether they can move to another city",
     "sure": "how sure they feel about the field they lean toward, on a scale from 0 to 10",
     "goals": "the field of study they lean toward and why",
@@ -50,6 +56,7 @@
     "history": "Education & experience",
     "interests": "Interests",
     "strengths": "Strengths",
+    "weaknesses": "Areas to work on",
     "family_social": "Family",
     "values": "Values",
     "pressures": "Pressures & limits",
@@ -67,6 +74,7 @@
     "family_social": "topic_text.family_social",
     "sure": "topic_text.sure",
     "values": "topic_text.values",
-    "strengths": "topic_text.strengths"
+    "strengths": "topic_text.strengths",
+    "weaknesses": "topic_text.weaknesses"
   }
 }

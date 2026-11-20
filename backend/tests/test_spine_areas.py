@@ -25,7 +25,7 @@ def coverage(data=None, facts=None, records=None):
 def test_empty_profile_has_ten_uncovered_areas():
     areas = coverage()
     assert set(areas) == {"status", "history", "interests", "strengths", "family_social",
-                          "values", "pressures", "sure", "goals", "options"}
+                          "values", "pressures", "sure", "goals", "options", "weaknesses"}
     assert not any(area["covered"] for area in areas.values())
 
 

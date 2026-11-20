@@ -22,14 +22,18 @@ def unknown_areas(coverage: dict, policy: dict | None = None) -> list[str]:
     """Areas not known, in asking order. An area missing from `coverage` is
     unknown; one outside the priority list goes last."""
     policy = policy if policy is not None else _policy()
-    order = policy["priority"]
-    areas = [*order, *(area for area in coverage if area not in order)]
+    order, outside = policy["priority"], set(policy.get("outside_meter", ()))
+    areas = [*order, *(area for area in coverage if area not in order and area not in outside)]
     return [area for area in areas if not _known(coverage.get(area, {}))]
 
 
 def completeness_from(coverage: dict, policy: dict | None = None) -> dict:
     policy = policy if policy is not None else _policy()
     labels, questions, order = policy["labels"], policy["questions"], policy["priority"]
+    # Areas outside the meter (weaknesses) are shown only when they have entries
+    # and never make the student's picture look less complete.
+    outside = set(policy.get("outside_meter", ()))
+    coverage = {key: row for key, row in coverage.items() if key not in outside}
     areas = [{"key": key, "label": labels.get(key, key), "covered": bool(row.get("covered")),
               "evidence": row.get("evidence"), "stale": bool(row.get("stale")),
               "item_count": row.get("item_count", 0), "min_items": row.get("min_items", 1),

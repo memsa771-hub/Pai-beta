@@ -78,7 +78,8 @@ def test_stale_area_is_unknown():
 
 
 def test_unknowns_follow_priority():
-    assert set(POLICY["labels"]) == set(PRIORITY) == set(POLICY["questions"])
+    assert set(POLICY["labels"]) == set(PRIORITY) | set(POLICY["outside_meter"]) == set(POLICY["questions"])
+    assert not set(PRIORITY) & set(POLICY["outside_meter"])
     coverage = {area: {"covered": False, "stale": False} for area in PRIORITY}
     coverage["goals"] = {"covered": True, "stale": False}
     coverage["sure"] = {"covered": True, "stale": True}
@@ -212,3 +213,32 @@ def test_notebook_source_follows_its_vault_type_freshness():
     result = coverage_areas(notebook, SimpleNamespace(facts={}, records={}))
     assert result["interests"]["covered"] and result["interests"]["stale"]
     assert result["family_social"]["covered"] and not result["family_social"]["stale"]
+
+
+def test_weaknesses_area_outside_meter():
+    assert POLICY["outside_meter"] == ["weaknesses"]
+    with StudentSession() as student, student.factory() as db:
+        _education(db, student.workspace_id)
+        coverage = MemoryService(db).coverage_areas(student.workspace_id)
+        result = VaultCompleteness(db).build(student.workspace_id)
+    assert "weaknesses" in coverage
+    without = completeness_from({k: v for k, v in coverage.items() if k != "weaknesses"}, POLICY)
+    assert (result["known"], result["total"]) == (without["known"], without["total"]) == (2, 10)
+    assert "weaknesses" not in {row["key"] for row in result["areas"]}
+    assert "weaknesses" not in {row["area"] for row in result["unknowns"]}
+    assert "weaknesses" not in unknown_areas(coverage, POLICY)
+
+
+def test_stated_weakness_covers_area():
+    with StudentSession() as student, student.factory() as db:
+        _item(db, student.workspace_id, "weakness", {"text": "Mathematics", "kind": "subject"})
+        coverage = MemoryService(db).coverage_areas(student.workspace_id)
+    assert coverage["weaknesses"]["covered"] is True
+    assert POLICY["labels"]["weaknesses"] == "Areas to work on"
+
+
+def test_next_question_never_asks_weaknesses():
+    everything = {area: {"covered": True, "stale": False} for area in PRIORITY}
+    everything["weaknesses"] = {"covered": False, "stale": False}
+    assert controller.decide(_state(everything)).topic != "weaknesses"
+    assert "weaknesses" not in controller.askable_areas(_state(everything, mentioned_areas=["weaknesses"]))
