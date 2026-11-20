@@ -26,7 +26,10 @@ RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 # Default image retains local Playwright/Chromium for self-hosted and fallback
 # browser use. Browser installation stays cached when application code changes.
 FROM python-deps AS browser-deps
-RUN playwright install-deps chromium && rm -rf /var/lib/apt/lists/*
+# Playwright's bundled Node needs libatomic1, which the slim base image lacks;
+# without it the `playwright` command exits 127 before it can install anything.
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && playwright install-deps chromium && rm -rf /var/lib/apt/lists/*
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN --mount=type=cache,id=pai-os-playwright-shell,target=/root/.cache/playwright,sharing=locked \
     PLAYWRIGHT_BROWSERS_PATH=/root/.cache/playwright \
