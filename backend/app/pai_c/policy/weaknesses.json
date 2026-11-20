@@ -1,0 +1,7 @@
+{
+  "_note": "Weak subjects read from the student's own marks (app/pai_c/understanding/weak_subjects.py; spec docs/superpowers/specs/2026-11-20-weaknesses-design.md). The marks of one education are read: the current or latest one (paths/fields.py current_education) when it has at least min_courses scored courses, else the next record that does, else the one with the most scored courses (floor rule only). A course is weak when its percent is below absolute_floor_percent, or, with at least min_courses scored courses, at least below_own_average_points under the average of that education's scored courses. A course with a grade letter and no percent or marks reads through grade_percent; any other grade is skipped.",
+  "absolute_floor_percent": 50,
+  "below_own_average_points": 15,
+  "min_courses": 3,
+  "grade_percent": {"A*": 90, "A": 80, "B": 70, "C": 60, "D": 50, "E": 40, "F": 30, "U": 0}
+}
