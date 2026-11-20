@@ -618,6 +618,7 @@
       "step_finish_exam": "Finish {level} (exam {month} {year})",
       "step_finish_intermediate": "Finish intermediate",
       "step_marks_unknown": "Meet the {min}% marks rule (add your marks)",
+      "step_strengthen": "Strengthen {subject}",
       "step_test_pass": "Take {name} (pass {pass}%)",
       "step_degree": "Study {degree} ({years} years)",
       "step_degree_years_unknown": "Study {degree}",

@@ -211,3 +211,43 @@ def test_steps_follow_the_standings_record():
     for key in ("group", "complete_intermediate", "marks"):
         assert step(steps, key)["evidence"]["id"] == f"education:{fsc_id}", key
     assert step(steps, "complete_intermediate")["status"] == "half"
+
+
+def course(name, percent, id):
+    return row("course", {"education_id": "edu", "name": name, "score": {"percentage": percent}}, id=id)
+
+
+def weakness(value, id="w1"):
+    entry = {"kind": "item", "type": "weakness", "id": id, "value": value, "level": "stated",
+             "source": "conversation", "document": None}
+    return SimpleNamespace(entry=entry, capture=None, sensitivity="normal")
+
+
+def test_strengthen_step_for_required_weak_subject():
+    steps = route("electrical_engineering", fsc("pre_engineering", 70),
+                  course("Mathematics", 45, "m"), course("Physics", 78, "p"), course("Chemistry", 80, "c"))
+    strengthen = step(steps, "strengthen:mathematics")
+    assert strengthen["status"] == "not" and strengthen["colour"] == "red"
+    assert strengthen["label_key"] == "step_strengthen" and strengthen["values"] == {"subject": "Mathematics"}
+    assert strengthen["evidence"]["id"] == "course:m"
+    kinds = [s["kind"] for s in steps]
+    assert kinds.index("strengthen") == kinds.index("marks") + 1
+    assert strengthen["tickable"] is False
+
+
+def test_strengthen_step_from_stated_weakness():
+    steps = route("electrical_engineering", fsc("pre_engineering", 70),
+                  weakness({"text": "Maths", "kind": "subject", "subject": "mathematics"}))
+    assert step(steps, "strengthen:mathematics")["evidence"]["id"] == "item:w1"
+
+
+def test_no_strengthen_step_for_unrelated_weakness():
+    steps = route("electrical_engineering", fsc("pre_engineering", 70),
+                  weakness({"text": "Biology", "kind": "subject", "subject": "biology"}))
+    assert "strengthen" not in [s["kind"] for s in steps]
+
+
+def test_strengthen_step_disappears_when_marks_improve():
+    steps = route("electrical_engineering", fsc("pre_engineering", 70),
+                  course("Mathematics", 75, "m"), course("Physics", 78, "p"), course("Chemistry", 80, "c"))
+    assert "strengthen" not in [s["kind"] for s in steps]

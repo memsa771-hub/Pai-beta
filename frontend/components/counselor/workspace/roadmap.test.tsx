@@ -320,3 +320,9 @@ it("fits a 375px phone: the route list and the sheet wrap instead of overflowing
     [...String(el.getAttribute("class")).matchAll(/\b(?:min-)?w-\[(\d+)px\]/g)].map((m) => +m[1]));
   expect(widths.every((w) => w <= 343)).toBe(true);
 });
+
+it("names a strengthen step with its subject", async () => {
+  const { stepLabel } = await import("./roadmap-text");
+  expect(stepLabel({ key: "strengthen:mathematics", label_key: "step_strengthen", values: { subject: "Mathematics" } }))
+    .toBe("Strengthen Mathematics");
+});

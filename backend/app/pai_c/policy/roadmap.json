@@ -26,6 +26,7 @@
   "step_finish_exam": "Finish {level} (exam {month} {year})",
   "step_finish_intermediate": "Finish intermediate",
   "step_marks_unknown": "Meet the {min}% marks rule (add your marks)",
+  "step_strengthen": "Strengthen {subject}",
   "step_test_pass": "Take {name} (pass {pass}%)",
   "step_degree": "Study {degree} ({years} years)",
   "step_degree_years_unknown": "Study {degree}",
@@ -41,7 +42,7 @@
  },
  "steps": {
   "_note": "Coloured route steps (app/pai_c/roadmap/steps.py; FOUR_FEATURES_SPEC 4.1). order: the step kinds in route order. colours: status to colour. month_labels: month number 1-12 as shown. test_pending_statuses: test_attempt details.status values that mean planned or registered (half). bridge_course_terms: a bridge or check step is done when a course record's name and the step's text share one of these words. manual_level: the evidence level a manual tick shows. tickable_kinds: the step kinds a student may tick, and only while the Vault is silent on them (status not, no Vault evidence): applying, a bridge or check with no course record, a test with no attempt. Every other step is read from the Vault and never ticked.",
-  "order": ["group", "complete_intermediate", "marks", "bridge", "check", "test", "apply", "degree"],
+  "order": ["group", "complete_intermediate", "marks", "strengthen", "bridge", "check", "test", "apply", "degree"],
   "colours": {"done": "green", "half": "yellow", "not": "red"},
   "month_labels": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   "test_pending_statuses": ["planned", "registered", "booked", "scheduled", "applied"],

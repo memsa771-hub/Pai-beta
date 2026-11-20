@@ -24,7 +24,7 @@ def _scored(rows: list, policy: dict) -> dict:
     by_education: dict = {}
     for row in rows:
         entry = row.entry
-        if entry["kind"] != "record" or entry["type"] != "course" or entry["stale"]:
+        if entry.get("kind") != "record" or entry.get("type") != "course" or entry.get("stale"):
             continue
         if getattr(row, "sensitivity", None) == "restricted":
             continue
@@ -37,7 +37,8 @@ def _scored(rows: list, policy: dict) -> dict:
 
 def _education_order(rows: list) -> list[str]:
     """Education record ids: the one paths and the roadmap read first, then the rest newest first."""
-    education = [row.entry for row in rows if row.entry["kind"] == "record" and row.entry["type"] == "education"]
+    education = [row.entry for row in rows
+                 if row.entry.get("kind") == "record" and row.entry.get("type") == "education"]
     first = current_education([entry["value"] for entry in education])
     ordered = sorted(education, key=lambda entry: entry["value"] is not first)
     return [str(entry["id"]) for entry in ordered]
@@ -65,5 +66,5 @@ def weak_subjects(rows: list) -> list[dict]:
         subject = (catalog.choice_code("subjects", value.get("name", ""))
                    or catalog.choice_code("subjects", value.get("normalized_name") or ""))
         weak.append({"ref": entry_ref(row.entry), "subject": subject, "name": value["name"], "percent": percent,
-                     "average": average, "rule": rule, "evidence": row.entry["level"], "row": row})
+                     "average": average, "rule": rule, "evidence": row.entry.get("level"), "row": row})
     return sorted(weak, key=lambda item: item["percent"])

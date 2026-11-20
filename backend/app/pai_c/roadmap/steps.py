@@ -151,6 +151,33 @@ def _marks(rule: Rule, standing: Standing, record: dict | None, row) -> dict:
                  timing=dict(improve) if improve else {"unknown": True})
 
 
+def _strengthen(rule: Rule | None, rows: list) -> list[dict]:
+    """A red "Strengthen <subject>" step for each subject the route requires
+    (admission rule required_subjects) that the student is weak in now: a
+    current stated weakness item with that subject, else a weak subject from
+    their marks. Never tickable; it disappears when the weakness is gone."""
+    if rule is None or not rule.required_subjects:
+        return []
+    from app.pai_c.understanding.weak_subjects import weak_subjects
+    catalog = vault_catalog()
+    stated = {}
+    for row in rows:
+        entry = row.entry
+        if entry.get("kind") == "item" and entry.get("type") == "weakness" and not entry.get("stale"):
+            code = (entry.get("value") or {}).get("subject")
+            if code:
+                stated.setdefault(code, row)
+    derived = {weak["subject"]: weak["row"] for weak in weak_subjects(rows) if weak["subject"]}
+    steps = []
+    for name in rule.required_subjects:
+        code = catalog.choice_code("subjects", name)
+        evidence = (stated.get(code) or derived.get(code)) if code else None
+        if evidence is not None:
+            steps.append(_step(f"strengthen:{code}", "step_strengthen", {"subject": catalog.label("subjects", code)},
+                               "not", evidence))
+    return steps
+
+
 def _course_for(text: str, courses: list):
     terms = [term for term in _policy()["steps"]["bridge_course_terms"] if term in str(text or "").lower()]
     for row in courses:
@@ -265,6 +292,7 @@ def route_steps(card: dict, standing: Standing, snapshot: list, items: list = ()
     steps = [_group(field_key, rule, standing, row), _complete_intermediate(standing, record, row, today)]
     if rule is not None and rule.min_percent is not None:
         steps.append(_marks(rule, standing, record, row))
+    steps += _strengthen(rule, rows)
     courses = _records(rows, "course")
     steps += [_need(need, rule, courses) for need in verdict["needs"] if need["kind"] in ("bridge", "check")]
     attempts = _records(rows, "test_attempt")
