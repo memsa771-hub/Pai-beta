@@ -57,7 +57,7 @@ class _Strict(BaseModel):
 
 class FitItem(_Strict):
     label: str = Field(min_length=1, max_length=200)
-    status: Literal["have", "partial", "blocker", "unknown"]
+    status: Literal["have", "partial", "blocker", "unknown", "work"]
     note: str = Field(default="", max_length=400)
     evidence_item_ids: list[str] = Field(default_factory=list)
 
@@ -200,6 +200,19 @@ async def _semantic_recall(db, workspace_id: str, query: str, citable: set[str])
         elif hit.get("text"):
             shown.append({"id": None, "kind": kind, "text": str(hit["text"])[:300]})
     return shown
+
+
+def weak_subjects_block(db, workspace_id: str) -> str:
+    """<weak_subjects>: subjects well below the student's own marks, each with
+    the course id a `work` fit item cites. Empty when there are none."""
+    from app.pai_c.understanding.weak_subjects import weak_subjects
+    weak = weak_subjects(MemoryService(db).vault_rows(workspace_id))
+    if not weak:
+        return ""
+    # The id as <records> and the evidence index name the course (no kind prefix).
+    rows = [{"id": str(row["row"].entry["id"]), "name": row["name"], "percent": row["percent"], "average": row["average"]}
+            for row in weak]
+    return "<weak_subjects>" + _json(rows) + "</weak_subjects>"
 
 
 def _study_field(candidate: Candidate) -> dict:
@@ -592,6 +605,9 @@ async def path_analysis_job(job, db) -> dict:
             + "<chat_language>" + _json(chat_language(db, job.workspace_id)) + "</chat_language>\n"
             + "<existing_paths>" + _json(reassess) + "</existing_paths>\n"
             + "<dismissed_paths>" + _json([row.title for row in existing if row.status == "dismissed"]) + "</dismissed_paths>")
+        weak_block = weak_subjects_block(db, job.workspace_id)
+        if weak_block:
+            analyst_input += "\n" + weak_block
         # Daily cap on model runs (cost): a quiet run over it is skipped, one
         # that answers a chat ask still runs (and is counted).
         within = take_daily(db, job.workspace_id, "path_analysis", config.PAI_PATH_ANALYSIS_MAX_PER_DAY)

@@ -79,7 +79,8 @@ def seed(student, db):
 
 def test_policy_prompt_and_document_agree():
     rules = policy()
-    assert rules["statuses"] == ["have", "partial", "blocker", "unknown"]
+    assert rules["statuses"] == ["have", "partial", "blocker", "unknown", "work"]
+    assert "work" not in rules["fit_evidence_statuses"] and "work" in rules["evidenced_statuses"]
     assert set(rules["evidenced_statuses"]) < set(rules["statuses"])
     prompt = load_prompt("path_analyzer")
     for status in rules["statuses"]:
@@ -331,3 +332,40 @@ def test_migration_112_adds_fit_and_analyzer_source_and_downgrades():
         db.commit()
         db.expire_all()
         assert db.get(PaiPossibility, row.id).fit == []
+
+
+def test_work_status_never_counts_toward_min_fit():
+    thin = path("electronic_engineering", fits=[fit("Hands-on skill", "have", ["c1"]), fit("Maths", "work", ["c2"])])
+    assert sanitize(PathAnalysis.model_validate(analysis(thin)), CITED, set(), CANDIDATES, vault=VAULT) == []
+    enough = path("electronic_engineering", fits=[*STRONG, fit("Maths", "work", ["c2"], note="Needs strong maths")])
+    result = sanitize(PathAnalysis.model_validate(analysis(enough)), CITED, set(), CANDIDATES, vault=VAULT)
+    assert [(row["label"], row["status"]) for row in result[0]["fit"]][-1] == ("Maths", "work")
+
+
+def test_weaknesses_and_course_changes_reach_the_path_engine():
+    rules = policy()
+    assert "weakness" in rules["evidence_item_types"]
+    assert {"weakness", "course"} <= set(rules["vault_trigger_types"])
+
+
+def test_weak_subjects_block_names_the_weak_course():
+    from app.memory.student_records import StudentRecordService
+    from app.pai_c.paths.analyzer import weak_subjects_block
+    with StudentSession() as student, student.factory() as db:
+        ws = student.workspace_id
+        records = StudentRecordService(db)
+        education = records.apply(ws, "education", FSC_ENGINEERING, source_type="user_explicit",
+                                  claim_origin="student", capture_method="explicit_correction")
+        db.commit()
+        education_id = str(getattr(education, "id", None) or education.record_id)
+        for name, percent in {"Mathematics": 45, "Physics": 78, "Chemistry": 80}.items():
+            records.apply(ws, "course", {"education_id": education_id, "name": name, "score": {"percentage": percent}},
+                          source_type="user_explicit", claim_origin="student", capture_method="explicit_correction")
+        db.commit()
+        block = weak_subjects_block(db, ws)
+        from app.pai_c.memory import MemoryService
+        citable = {card["id"] for card in MemoryService(db).profile_cards(ws)}
+    assert block.startswith("<weak_subjects>") and block.endswith("</weak_subjects>")
+    rows = json.loads(block.removeprefix("<weak_subjects>").removesuffix("</weak_subjects>"))
+    assert [(row["name"], row["percent"]) for row in rows] == [("Mathematics", 45)]
+    assert rows[0]["id"] in citable
