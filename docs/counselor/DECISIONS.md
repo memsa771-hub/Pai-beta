@@ -407,3 +407,11 @@ The Counselor shell accidentally omitted the shared UserMenu when replacing the 
 - The pharmacy entry test was removed from the catalog (no test found); placeholders are not shipped.
 - Extraction beta bar: core recall at least 90 % on the golden set; the live eval is capped at $5.
 - The usage endpoint takes the Firebase bearer and checks `PAI_FOUNDER_EMAILS` (the product has no admin auth); non-founders see no spend card.
+
+## Weaknesses (20 Nov 2026)
+
+Founder approved approach C: weaknesses the student states plus weak subjects read from their marks. Study-only
+kinds; never inferred from chat; never block a path; outside the completeness meter so a student with good marks
+never looks incomplete. PAI never raises the topic on its own (no question-bank item). A `work` fit note uses
+words, not percentages, because notes with a percent are cleared as world numbers. The Roadmap step has no green
+state: it disappears when the weakness is gone, since green would need history the Vault does not keep.

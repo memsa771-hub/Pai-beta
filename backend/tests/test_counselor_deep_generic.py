@@ -40,3 +40,10 @@ def test_deep_python_modules_do_not_name_documented_personas():
             assert not re.search(rf"\b{re.escape(name)}\b", content, re.IGNORECASE), (
                 f"{source.name} embeds a documentation persona"
             )
+
+
+def test_voice_names_a_weakness_plainly_with_a_next_action():
+    backend = Path(__file__).resolve().parents[1]
+    runtime = (backend / "app/pai_c/voice/prompts/voice.md").read_text(encoding="utf-8")
+    assert "When you speak about something the student finds hard" in runtime
+    assert "one concrete next action" in runtime and "never a judgement" in runtime

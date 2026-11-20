@@ -146,9 +146,12 @@ def guided_state(db, workspace_id, decision, coverage, open_requests):
         stage = "getting_to_know"
     rows = db.scalars(select(CounselorTurnDecision).where(CounselorTurnDecision.workspace_id == workspace_id)
         .order_by(CounselorTurnDecision.source_timestamp.desc(), CounselorTurnDecision.id.desc()).limit(3)).all()
+    from app.pai_c.policy.controller import load_data
+    # Areas outside the meter (weaknesses) are never shown as a gap to fill.
+    outside = set(load_data("areas_policy.json").get("outside_meter", ()))
     return {"stage": stage,
             "areas": {area: {key: row.get(key) for key in ("covered", "item_count", "min_items")}
-                      for area, row in coverage.items()},
+                      for area, row in coverage.items() if area not in outside},
             "open_requests": open_requests[:5],
             "last_moves": [{"action": (row.decision or {}).get("action") or row.move, "moves": row.moves or []}
                            for row in reversed(rows)],

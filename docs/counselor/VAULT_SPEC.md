@@ -98,3 +98,16 @@ Deferred:
 
 ## Status (29 Oct 2026, branch four-features)
 Added by [FOUR_FEATURES_SPEC.md](FOUR_FEATURES_SPEC.md): a completeness meter (`GET /v1/vault` returns `completeness`: known areas with stale ones excluded, and an ordered unknowns list that also drives the counselor's next question), and Vault items as evidence everywhere (items are cards `item:<id>` that the Mirror and Path engine cite). Items are embedded for semantic recall under a monthly cost cap.
+
+## Status (20 Nov 2026, branch backup-main): weaknesses
+
+Spec: `docs/superpowers/specs/2026-11-20-weaknesses-design.md`.
+- New item type `weakness` (text, basis, kind from `weakness_kinds`, subject from the new general `subjects` list).
+  Stated only: the extractor drops an inferred weakness in code. A dislike is not a weakness.
+- Weak subjects from marks are computed on read (`pai_c/understanding/weak_subjects.py`, thresholds in
+  `pai_c/policy/weaknesses.json`) and never stored.
+- Area `weaknesses` ("Areas to work on") is outside the completeness meter (`areas_policy.json` `outside_meter`):
+  not in known/total, never an unknown, never asked for, shown on the Mirror and profile only with entries.
+- Path engine fit status `work` ("Needs work"): never counts toward min_fit_evidence, never blocks.
+- Roadmap: a red, untickable "Strengthen <subject>" step for a weak subject the route requires; it disappears
+  when the weakness is gone.
