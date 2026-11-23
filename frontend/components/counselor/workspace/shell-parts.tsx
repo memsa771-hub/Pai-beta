@@ -17,11 +17,11 @@ export type SubView = keyof typeof copy.subTabs;
 /** Four places plus Settings. A section owns one or more views; the first is
  * where its nav item lands. */
 export const SECTIONS: { key: SectionKey; icon: LucideIcon; views: string[] }[] = [
-  { key: "overview", icon: LayoutDashboard, views: ["overview", "mirror"] },
+  { key: "overview", icon: LayoutDashboard, views: ["overview"] },
   { key: "threads", icon: MessageCircle, views: ["threads", "notifications"] },
   { key: "roadmaps", icon: Map, views: ["paths", "roadmap"] },
   { key: "journey", icon: Route, views: ["journey"] },
-  { key: "vault", icon: FolderLock, views: ["files", "profile"] },
+  { key: "vault", icon: FolderLock, views: ["files", "profile", "mirror"] },
   { key: "settings", icon: Settings, views: ["settings"] },
 ];
 export const MAIN_SECTIONS = SECTIONS.filter((s) => s.key !== "settings");

@@ -469,7 +469,7 @@
   "sections": {
     "overview": {
       "label": "Overview",
-      "hint": "Your signals, your Mirror and the next best step"
+      "hint": "Your signals and the next best step"
     },
     "threads": {
       "label": "PAI",
@@ -485,7 +485,7 @@
     },
     "vault": {
       "label": "Vault",
-      "hint": "Your documents and what PAI knows"
+      "hint": "Your documents, what PAI knows and your Mirror"
     },
     "settings": {
       "label": "Settings",
