@@ -1,5 +1,8 @@
 # Roadmap engine spec (26 Oct 2026)
 
+> **27 Nov 2026: the Roadmap page is removed from PAI C** (DECISIONS.md, "Paths only"). Students compare and choose on Paths; eligibility moved to `app/pai_c/paths/eligibility.py`, the choice to `app/pai_c/paths/choice.py`. Steps, timeline and calendar are kept for PAI OS reuse. This spec is history for the removed page.
+
+
 Founder decision: the Roadmaps page shows, simply and attractively, **which fields this student can actually get
 into, from what PAI knows**, and how. Roadmaps are made by a separate engine, not by chat. Compare and Plan as they
 are today are replaced. The old roadmap code may be removed; the new engine must be complete and correct.

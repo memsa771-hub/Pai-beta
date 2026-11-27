@@ -1,0 +1,31 @@
+{
+  "_note": "Paths eligibility (app/pai_c/paths/eligibility.py): whether the student can get into a path's study field from their education, shown as a badge on Paths and in the Compare table. It informs and never decides: any live path can be chosen. status_order sorts the statuses (best first). The check returns reasons as {key, values}; copy holds the English template per key ({name} placeholders are the reason's values; choose_group groups render as their route_label joined by group_joiner). education_line renders the student's education. compare: how many paths the Compare table takes. The frontend copy.json compare section mirrors this file (a test keeps them in step).",
+  "status_order": [
+    "open",
+    "step",
+    "not_open",
+    "unknown"
+  ],
+  "group_joiner": " or ",
+  "copy": {
+    "needs_percent": "Needs {min}%; you have {have}%",
+    "add_marks": "Add your marks to check the {min}% rule",
+    "rule_step": "{text}",
+    "check": "{note}",
+    "choose_group": "Choose {groups} in intermediate",
+    "choose_any_group": "Choose any group in intermediate",
+    "not_open_group": "Not open from {group_label}",
+    "cannot_check": "PAI cannot check this field yet",
+    "undergrad_only": "Undergraduate entry rules only for now",
+    "needs_education": "Tell PAI your education first"
+  },
+  "education_line": {
+    "with_percent": "From {level} {groups}, {percent}%",
+    "without_percent": "From {level} {groups}",
+    "groups_joiner": " / "
+  },
+  "compare": {
+    "min": 2,
+    "max": 3
+  }
+}

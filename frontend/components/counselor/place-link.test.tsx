@@ -19,10 +19,11 @@ it('renders nothing for a place the workspace does not have', () => {
 });
 it('resolves old place names the way the shell does', () => {
   window.history.replaceState({}, '', '/my-space?view=threads');
-  for (const old of ['compare', 'plan']) {
+  // The removed Roadmap page and its old Compare and Plan tabs land on Paths.
+  for (const old of ['roadmap', 'roadmaps', 'compare', 'plan']) {
     render(<PlaceLink place={old} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
-    expect(window.location.search).toBe('?view=roadmap');
+    fireEvent.click(screen.getByRole('button', { name: 'Paths' }));
+    expect(window.location.search).toBe('?view=paths');
     cleanup();
   }
 });

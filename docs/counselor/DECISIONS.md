@@ -415,3 +415,43 @@ kinds; never inferred from chat; never block a path; outside the completeness me
 never looks incomplete. PAI never raises the topic on its own (no question-bank item). A `work` fit note uses
 words, not percentages, because notes with a percent are cleared as world numbers. The Roadmap step has no green
 state: it disappears when the weakness is gone, since green would need history the Vault does not keep.
+
+## 27 November 2026: Paths only; the Counselor Roadmap page is removed (founder)
+
+The founder asked for no Roadmap in PAI C: one Paths menu where the student compares paths and chooses one, with no
+Explore. To learn more about a path, the student chooses it and asks PAI in the chat. The route plan (steps, dates,
+calendar, workflows) belongs to PAI OS.
+
+- **Menu.** The "Roadmaps" section (Paths + Roadmap tabs) is now one "Paths" item. Old `roadmap`, `roadmaps`,
+  `compare` and `plan` views, saved desktop views, chat place links and `system:roadmaps` notifications open Paths.
+- **Paths row.** Choose (one confirm dialog), save, not for me, the Compare tick and an eligibility badge. A chosen
+  path shows "Ask PAI", which opens the chat with a draft about it (never an auto-send). On phones the Compare tick
+  sits in the row's top corner so the controls keep the original one-line layout.
+- **No Explore.** The path page, the places (programs) page and the Explore buttons are gone from the UI, including
+  the chat path card (its button now opens Paths). The backend explore/programs endpoints stay: the Counselor's own
+  research still uses them, and removing them is a separate decision.
+- **Any live path can be chosen** (Claude's call). The Roadmap refused not-open and cannot-check fields, which blocked
+  every degree student (bachelor to master) because the rules cover undergraduate entry only. Eligibility now informs
+  and never decides. Choosing the chosen path again is a no-op; choosing another replaces it (the old one goes back to
+  saved). A path with no study field is recorded with `field_key` "path:<id>".
+- **Eligibility badge** (CLAUDE.md "Paths with eligibility badges"): Open / Needs a step / Not open from
+  `app/pai_c/paths/eligibility.py` (moved out of the roadmap engine, same rules). "Cannot check yet" is not shown on
+  rows (it would repeat on every path of such a student); the Compare table still says it.
+- **Compare** (2-3 paths): how it fits you, why it fits, can you get in, marks needed vs yours, extra step, entry test,
+  years. Steps done, time to entry and rule confidence were dropped with the steps and calendar.
+- **Decision record.** `pai_route_decisions` and `GET /v1/decision-records/current` stay (the OS contract). A new
+  choice stores the eligibility snapshot and route facts with no steps; the record no longer carries `steps`, `time`,
+  `snapshot_steps` or `steps_done`. No migration: the columns stay, so no table or column is dropped.
+- **Kept for PAI OS reuse** (CLAUDE.md): `pai_c/roadmap/steps.py`, `timeline.py`, `calendar.py`, `policy/roadmap.json`
+  and `policy/academic_calendar.json`, with their tests. Nothing in PAI C calls them; `steps.py` now reads eligibility
+  from `paths/eligibility.py` and rules from `paths/admission.py` (moved from `roadmap/rules.py`).
+- **Removed:** `pai_c/roadmap/engine.py` (page builder), `pai_c/roadmap/decisions.py` (replaced by
+  `pai_c/paths/choice.py`), `routers/roadmap.py` (`/v1/roadmap*`), the frontend Roadmap page files and `lib/roadmap.ts`.
+- **Counselor copy.** The proposed and chosen next steps now point to Paths; the chosen phase no longer names a route
+  step (this replaces the 29 October ruling "In CHOSEN the next step names the first open step of the chosen route").
+  About PAI names three features (Vault, Mirror, Paths). Prompt edits are synced in COUNSELOR_V3_PROMPTS.md.
+- **Journey A-K is unchanged in letters.** Stage I ("Choose your path") is reached by a chosen path and opens Paths;
+  J and K open the chat until PAI OS exists. G and H can no longer be reached on their own (no Explore, no places
+  search); choosing a path passes them.
+- **Not reachable for now:** family-talk preparation and the "How is it going?" check-in card lived only on the
+  Roadmap "Your route" card. Their backend stays; where they go on Paths or in chat is open for the founder.

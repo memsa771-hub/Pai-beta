@@ -80,6 +80,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
   const progress = journey.progress;
   const total = copy.stages.length;
   const live = possibilities.filter((p) => p.status !== "dismissed");
+  const chosenPath = live.find((p) => p.status === "chosen");
   const facts = (vault.data || []).filter((e) => !layout.hiddenKeys.includes(e.type));
   const missing = missingBasics(facts);
   const stage = progress.stage;
@@ -100,7 +101,14 @@ export function Overview({ journey, navigate, openPath, onChat }: {
       action: text.recMissingAction,
       run: () => onChat(fill(text.recMissingDraft, { label: missing[0].label.toLowerCase() })),
     }] : []),
-    ...(live[0] ? [{
+    // Once a path is chosen, the next move is asking PAI about it, not choosing again.
+    ...(chosenPath ? [{
+      key: "path",
+      title: fill(text.recChosenTitle, { title: chosenPath.title }),
+      body: text.recChosenBody,
+      action: text.recChosenAction,
+      run: () => onChat(fill(text.recChosenDraft, { title: chosenPath.title })),
+    }] : live[0] ? [{
       key: "path",
       title: fill(text.recPathTitle, { title: live[0].title }),
       body: text.recPathBody,
@@ -120,7 +128,7 @@ export function Overview({ journey, navigate, openPath, onChat }: {
 
       <section aria-label={text.title} className="grid shrink-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Metric tone="lime" label={text.metrics.paths} value={live.length}
-          sub={live.length ? fill(text.metrics.pathsSub, { saved: live.filter((p) => p.status === "saved").length, exploring: live.filter((p) => p.status === "exploring" || p.status === "chosen").length }) : text.metrics.pathsNone} />
+          sub={live.length ? fill(text.metrics.pathsSub, { saved: live.filter((p) => p.status === "saved").length, chosen: live.filter((p) => p.status === "chosen").length }) : text.metrics.pathsNone} />
         <Metric label={text.metrics.journey} value={<>{progress.current}<span className="text-lg font-semibold text-muted-foreground"> / {total}</span></>}
           sub={fill(text.metrics.journeySub, { title: stage.title })} />
         <Metric label={text.metrics.vault} value={vault.data ? facts.length : "–"}

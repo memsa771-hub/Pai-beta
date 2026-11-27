@@ -12,7 +12,7 @@
 
 export const messages = {
   possibilities: {
-    title: 'Possibilities', explore: 'Explore it', save: 'Save for later', dismiss: 'Not for me',
+    title: 'Possibilities', choose: 'Compare and choose', save: 'Save for later', dismiss: 'Not for me',
     suggested: 'Suggested', exploring: 'Exploring', saved: 'Saved for later', dismissed: 'Dismissed', chosen: 'Chosen',
     error: 'Could not update possibilities. Please try again.',
   },
@@ -131,7 +131,7 @@ export const messages = {
 
   /** View names. Shared by the sidebar, the nav rail and the app header. */
   views: {
-    overview: "Overview", mirror: "Your Mirror", journey: "Your journey", paths: "Paths", roadmap: "Roadmap", settings: "Settings",
+    overview: "Overview", mirror: "Your Mirror", journey: "Your journey", paths: "Paths", settings: "Settings",
     paiCounselor: 'PAI Counselor',
     profile: 'Profile',
     applications: 'Applications',

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   render,
@@ -7,21 +9,18 @@ import {
   waitFor,
   cleanup,
   act,
+  within,
 } from "@testing-library/react";
-import { Paths, PathPage, ProgramPage } from "./paths";
+import { Paths } from "./paths";
 import { workspaceApi } from "@/lib/api";
-import {
-  possibilities,
-  pathResult,
-  programs,
-} from "@/tests/fixtures/counselor";
+import { pathComparison, possibilities } from "@/tests/fixtures/counselor";
+import type { Possibility } from "@/lib/possibilities";
+import copy from "./copy.json";
 vi.mock("@/lib/api", () => ({
   workspaceApi: {
     getPossibilities: vi.fn(),
     changePossibility: vi.fn(),
-    getPath: vi.fn(),
-    getPrograms: vi.fn(),
-    searchPrograms: vi.fn(),
+    comparePaths: vi.fn(),
     addOwnPath: vi.fn(),
     getPathAnalysis: vi.fn(),
   },
@@ -32,33 +31,134 @@ afterEach(() => {
 });
 beforeEach(() => {
   vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: null, done: true, outcome: null });
+  vi.mocked(workspaceApi.comparePaths).mockResolvedValue({ education_line: null, paths: [] });
 });
-it("opens a path without initiating program research", async () => {
+const third: Possibility = { ...possibilities[1], id: "path-three", title: "Medicine", status: "suggested" };
+const four: Possibility = { ...possibilities[1], id: "path-four", title: "Law", status: "suggested" };
+
+it("has no Explore and no page per path: only Choose, save, not for me and the Compare tick", async () => {
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
-  const open = vi.fn();
-  render(<Paths onOpen={open} />);
-  fireEvent.click((await screen.findAllByText("Explore"))[0]);
-  expect(open).toHaveBeenCalledWith("path-one");
-  expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
-});
-it("lists paths with a fit summary and shows each verdict with the student's words on the path page", async () => {
-  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
-  render(<Paths onOpen={vi.fn()} />);
+  render(<Paths />);
   const row = (await screen.findByText("Practical design")).closest("li")!;
+  expect(screen.queryByText("Explore")).toBeNull();
+  expect(within(row).getByRole("button", { name: "Choose" })).toBeTruthy();
+  expect(within(row).getByRole("checkbox", { name: "Compare Practical design" })).toBeTruthy();
   expect(row.querySelector('[role="img"]')?.getAttribute("aria-label"))
     .toBe("1 you have, 1 partly, 0 in the way, 0 need work, 1 not known yet");
-  vi.mocked(workspaceApi.getPath).mockResolvedValue(pathResult);
-  cleanup();
-  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
-  expect(await screen.findByText("How it fits you")).toBeTruthy();
-  expect(screen.getByText("You already repair and build things.")).toBeTruthy();
-  expect(screen.getByText("From what you said: “I sketch before I build.”")).toBeTruthy();
 });
+
+it("chooses a path only after one confirm, then follows the journey", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
+  vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...possibilities[1], status: "chosen" });
+  const changed = vi.fn();
+  render(<Paths onChanged={changed} />);
+  const row = (await screen.findByText("Applied computing")).closest("li")!;
+  fireEvent.click(within(row).getByRole("button", { name: "Choose" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByText("Choose Applied computing?")).toBeTruthy();
+  expect(workspaceApi.changePossibility).not.toHaveBeenCalled();
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([possibilities[0], { ...possibilities[1], status: "chosen" }]);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Yes, choose it" }));
+  await waitFor(() => expect(workspaceApi.changePossibility).toHaveBeenCalledExactlyOnceWith("path-two", "choose"));
+  await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+it("Not now closes the confirm without choosing", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
+  render(<Paths />);
+  fireEvent.click((await screen.findAllByRole("button", { name: "Choose" }))[0]);
+  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Not now" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(workspaceApi.changePossibility).not.toHaveBeenCalled();
+});
+
+it("a chosen path offers Ask PAI, which opens the chat with a draft about it", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([{ ...possibilities[0], status: "chosen" }, possibilities[1]]);
+  const chat = vi.fn();
+  render(<Paths onChat={chat} />);
+  const row = (await screen.findByText("Practical design")).closest("li")!;
+  expect(within(row).queryByRole("button", { name: "Choose" })).toBeNull();
+  fireEvent.click(within(row).getByRole("button", { name: "Ask PAI" }));
+  expect(chat).toHaveBeenCalledWith("I chose Practical design. Tell me more about this path.");
+  expect(workspaceApi.changePossibility).not.toHaveBeenCalled();
+});
+
+it("compares two or three paths with the same rows for each", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([...possibilities, third, four]);
+  vi.mocked(workspaceApi.comparePaths).mockResolvedValue(pathComparison);
+  render(<Paths />);
+  expect(await screen.findByText(copy.compare.hint)).toBeTruthy();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Compare Practical design" }));
+  const bar = screen.getByRole("button", { name: "Pick 1 more to compare" }) as HTMLButtonElement;
+  expect(bar.disabled).toBe(true);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Compare Applied computing" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Compare Medicine" }));
+  expect((screen.getByRole("checkbox", { name: "Compare Law" }) as HTMLInputElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Compare (3)" }));
+  const table = within(await screen.findByRole("dialog")).getByRole("table");
+  expect(workspaceApi.comparePaths).toHaveBeenLastCalledWith(["path-one", "path-two", "path-three"]);
+  expect(within(table).getAllByRole("rowheader").map((th) => th.textContent)).toEqual(Object.values(copy.compare.rows));
+  await within(table).findByText("ECAT / NET");
+  expect(within(table).getAllByText("60% · you 78%")).toHaveLength(3);
+  expect(within(table).getByText("Bridge or extra courses")).toBeTruthy();
+  expect(within(table).getByText("Not open from Pre-Engineering")).toBeTruthy();
+  expect(within(table).getByText("Needs a step")).toBeTruthy();
+  // Every rule fact shows its confidence, its sources and when the rules were checked.
+  expect(within(table).getAllByText("Official")).toHaveLength(2);
+  expect(within(table).getByText("Uncertain")).toBeTruthy();
+  expect(within(table).getByText("Check with the university")).toBeTruthy();
+  expect(within(table).getAllByRole("link", { name: "pec.org.pk" })[0].getAttribute("href")).toBe("https://www.pec.org.pk/regulations.pdf");
+  expect(screen.getByText("Admission rules last checked October 2026.")).toBeTruthy();
+  expect(workspaceApi.changePossibility).not.toHaveBeenCalled();
+});
+
+it("offers no Compare tick while there is only one live path", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([possibilities[0], { ...possibilities[1], status: "dismissed" }]);
+  render(<Paths />);
+  await screen.findByText("Practical design");
+  expect(screen.queryByRole("checkbox")).toBeNull();
+  expect(screen.queryByText(copy.compare.hint)).toBeNull();
+});
+
+it("shows each path's eligibility badge from the Vault, never 'cannot check' on a row", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([...possibilities, third]);
+  vi.mocked(workspaceApi.comparePaths).mockResolvedValue({ ...pathComparison, paths: [
+    pathComparison.paths[0], { id: "path-two", verdict: { ...pathComparison.paths[1].verdict, status: "unknown" } }, pathComparison.paths[2]] });
+  render(<Paths />);
+  const row = (id: string) => screen.getByText(id).closest("li")!;
+  await waitFor(() => expect(within(row("Practical design")).getByText("Open")).toBeTruthy());
+  expect(workspaceApi.comparePaths).toHaveBeenCalledWith(["path-one", "path-two", "path-three"]);
+  expect(within(row("Medicine")).getByText("Not open")).toBeTruthy();
+  expect(within(row("Applied computing")).queryByText("Cannot check yet")).toBeNull();
+  // Not open never blocks the choice.
+  expect(within(row("Medicine")).getByRole("button", { name: "Choose" })).toBeTruthy();
+});
+
+it("Clear empties the Compare pick", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
+  render(<Paths />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Compare Practical design" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+  expect(screen.queryByRole("button", { name: /to compare/ })).toBeNull();
+  expect((screen.getByRole("checkbox", { name: "Compare Practical design" }) as HTMLInputElement).checked).toBe(false);
+});
+
+it("says so calmly when the comparison cannot load", async () => {
+  vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
+  vi.mocked(workspaceApi.comparePaths).mockRejectedValue(new Error("down"));
+  render(<Paths />);
+  fireEvent.click(await screen.findByRole("checkbox", { name: "Compare Practical design" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Compare Applied computing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Compare (2)" }));
+  expect(await within(await screen.findByRole("dialog")).findByRole("alert")).toBeTruthy();
+});
+
 it("adds the student's own path and follows PAI's run, with no find button", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
   vi.mocked(workspaceApi.addOwnPath).mockResolvedValue({ ...possibilities[1], id: "mine", title: "Nursing" });
-  render(<Paths onOpen={vi.fn()} />);
+  render(<Paths />);
   fireEvent.click(await screen.findByRole("button", { name: "Add your own path" }));
   expect(screen.queryByRole("button", { name: "Find my paths" })).toBeNull();
   const add = screen.getByRole("button", { name: "Add path" }) as HTMLButtonElement;
@@ -76,89 +176,18 @@ it("adds the student's own path and follows PAI's run, with no find button", asy
   await waitFor(() => expect(screen.queryByText(/PAI is looking at everything/)).toBeNull());
   vi.useRealTimers();
 });
-it("shows general explanation and invites deeper research only afterwards", async () => {
-  vi.mocked(workspaceApi.getPath).mockResolvedValue(pathResult);
-  const places = vi.fn();
-  render(
-    <PathPage
-      id="path-one"
-      onBack={vi.fn()}
-      onPlaces={places}
-      onChat={vi.fn()}
-    />,
-  );
-  expect(await screen.findByText("What you study")).toBeTruthy();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Look at places" }),
-  );
-  expect(places).toHaveBeenCalledOnce();
-  expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
-});
-it("H requires explicit consent, preserves no-source state", async () => {
-  vi.mocked(workspaceApi.getPrograms)
-    .mockResolvedValueOnce({ status: "not_started", programs: [], missing: [] })
-    .mockResolvedValue(programs);
-  render(<ProgramPage id="path-one" onBack={vi.fn()} />);
-  const button = await screen.findByRole("button", {
-    name: "Look at programs",
-  });
-  expect((button as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole("checkbox"));
-  fireEvent.click(button);
-  await waitFor(() =>
-    expect(workspaceApi.searchPrograms).toHaveBeenCalledExactlyOnceWith(
-      "path-one",
-    ),
-  );
-  expect(
-    await screen.findByText(/No verified program information/),
-  ).toBeTruthy();
-});
 
-it('expired evidence requires fresh consent and offers no next step',async()=>{
- vi.mocked(workspaceApi.getPrograms).mockResolvedValue({status:'stale',programs:[],missing:['expired_sources']});
- render(<ProgramPage id='path-one' onBack={vi.fn()}/>);
- const button=await screen.findByRole('button',{name:'Look at programs'});
- expect((button as HTMLButtonElement).disabled).toBe(true);
- expect(screen.queryByRole('button',{name:'Open Roadmap'})).toBeNull();
- expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
-});
-
-it('a completed places search points to the Roadmap page without starting work',async()=>{
- vi.mocked(workspaceApi.getPrograms).mockResolvedValue({...programs,status:'completed'});
- const onRoadmap=vi.fn();
- render(<ProgramPage id='path-one' onBack={vi.fn()} onRoadmap={onRoadmap}/>);
- fireEvent.click(await screen.findByRole('button',{name:'Open Roadmap'}));
- expect(onRoadmap).toHaveBeenCalledOnce();
- expect(workspaceApi.searchPrograms).not.toHaveBeenCalled();
-});
-
-it('polls durable pending jobs until a result exists',async()=>{
- vi.useFakeTimers();
- try {
-  vi.mocked(workspaceApi.getPath).mockResolvedValue({...pathResult,status:'pending',path:null});
-  await act(async()=>{render(<PathPage id='path-one' onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()}/>);});
-  expect(workspaceApi.getPath).toHaveBeenCalledTimes(1);
-  await act(async()=>{await vi.advanceTimersByTimeAsync(5000);});
-  expect(workspaceApi.getPath).toHaveBeenCalledTimes(2);
- } finally {cleanup();vi.useRealTimers();}
-});
-
-it("shows a study field's group notes on the path row and the path page, never raw codes", async () => {
+it("shows a study field's group notes on the path row, never raw codes", async () => {
   const field = { ...possibilities[0], title: "Electrical Engineering",
     study_field: { key: "electrical_engineering", needs_check: true, needs_group: [{ code: "pre_engineering", label: "Pre-Engineering" }] } };
   const older = { ...possibilities[1], id: "older", title: "Mechanics and metal trades", status: "saved" as const, study_field: { outdated: true } };
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([field, older]);
-  render(<Paths onOpen={vi.fn()} />);
+  render(<Paths />);
   const row = (await screen.findByText("Electrical Engineering")).closest("li")!;
   expect(row.textContent).toContain("Needs checking for your group");
   expect(row.textContent).toContain("Needs Pre-Engineering in intermediate");
   expect(row.textContent).not.toContain("pre_engineering");
   expect(screen.getByText("Mechanics and metal trades").closest("li")!.textContent).toContain("Older suggestion");
-  cleanup();
-  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, possibility: field });
-  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
-  expect(await screen.findByText("Needs checking for your group")).toBeTruthy();
 });
 
 it("marks a kept field outside the current group and lets the student remove an older suggestion", async () => {
@@ -167,7 +196,7 @@ it("marks a kept field outside the current group and lets the student remove an 
   const older = { ...possibilities[1], id: "older", title: "Computer use", status: "saved" as const, study_field: { outdated: true } };
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([kept, older]);
   vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...older, status: "dismissed" });
-  render(<Paths onOpen={vi.fn()} />);
+  render(<Paths />);
   expect((await screen.findByText("Pharm-D")).closest("li")!.textContent).toContain("Not open to your current group");
   const row = screen.getByText("Computer use").closest("li")!;
   expect(row.textContent).toContain("Older suggestion, from before fields of study");
@@ -180,12 +209,12 @@ it("asks for the education when the last run needed it, and shows PAI's own run 
   try {
     vi.mocked(workspaceApi.getPossibilities).mockResolvedValue(possibilities);
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-1", done: true, outcome: "needs_education" });
-    render(<Paths onOpen={vi.fn()} />);
+    render(<Paths />);
     expect(await screen.findByText("PAI needs your group or field to suggest fields of study.")).toBeTruthy();
     cleanup();
     // A run PAI started on its own (e.g. after an education write) shows while it works.
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: false, outcome: null });
-    render(<Paths onOpen={vi.fn()} />);
+    render(<Paths />);
     expect(await screen.findByText(/PAI is looking at everything/)).toBeTruthy();
     vi.mocked(workspaceApi.getPathAnalysis).mockResolvedValue({ job_id: "job-2", done: true, outcome: "needs_education" });
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
@@ -193,14 +222,10 @@ it("asks for the education when the last run needed it, and shows PAI's own run 
     expect(screen.queryByText(/PAI is looking at everything/)).toBeNull();
   } finally { vi.useRealTimers(); }
 });
-it("notes calmly when the Vault changed since the explanation was written", async () => {
-  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, stale: true });
-  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
-  expect(await screen.findByText("Your Vault changed since PAI wrote this, so parts of it may be out of date.")).toBeTruthy();
-});
-it("says nothing about age when the explanation is current", async () => {
-  vi.mocked(workspaceApi.getPath).mockResolvedValue({ ...pathResult, stale: false });
-  render(<PathPage id="path-one" onBack={vi.fn()} onPlaces={vi.fn()} onChat={vi.fn()} />);
-  await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByText(/may be out of date/)).toBeNull();
+
+it("keeps the Compare words in step with the backend eligibility policy", () => {
+  const policy = JSON.parse(readFileSync(resolve(__dirname, "../../../../backend/app/pai_c/policy/eligibility.json"), "utf8"));
+  expect(copy.compare.templates).toEqual(policy.copy);
+  expect(copy.compare.groupJoiner).toBe(policy.group_joiner);
+  expect(copy.compare.limits).toEqual(policy.compare);
 });

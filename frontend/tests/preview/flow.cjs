@@ -62,49 +62,27 @@ module.exports = async function flow(browser, open, ORIGIN) {
     await page.getByRole('dialog').waitFor();
     assert.match(page.url(), /view=profile/, 'This is wrong opens the Vault');
 
-    // F-G: paths first. Merely viewing a path must not search programs.
-    await page.getByRole('navigation').getByRole('button', { name: 'Roadmaps', exact: true }).click();
-    await page.getByRole('heading', { name: 'Directions worth exploring' }).waitFor();
-    await page.getByRole('button', { name: 'Explore', exact: true }).first().click();
-    await page.getByRole('heading', { name: 'What it is', exact: true }).waitFor();
-    assert.equal((await called(page, 'searchPrograms')).length, 0, 'no program search from viewing a path');
-
-    // H: the student explicitly opens places and consents before any search.
-    await page.getByRole('button', { name: 'Look at places' }).click();
-    const search = page.getByRole('button', { name: 'Look at programs' });
-    assert(await search.isDisabled(), 'search needs consent');
-    await page.getByRole('checkbox').check();
-    await search.click();
-    await page.getByText('No verified program information is available yet.', { exact: false }).waitFor();
-    assert.equal((await called(page, 'searchPrograms')).length, 1, 'one search after consent');
-
-    // I: the Roadmap page shows where the student can go; nothing is chosen
-    // for them, and a choice is one explicit press in the route sheet.
-    await page.getByRole('group', { name: 'Sections' }).getByRole('button', { name: 'Roadmap', exact: true }).click();
-    await page.getByRole('heading', { name: 'Where you can go', exact: true }).waitFor();
-    assert.equal((await called(page, 'chooseRoute')).length, 0, 'no automatic choice');
-    assert(!(await page.getByRole('button', { name: 'See route for MBBS' }).isVisible()), 'not open is collapsed');
-    await page.getByText('Not open from your group').click();
-    await page.getByRole('button', { name: 'See route for MBBS' }).click();
-    assert(await page.getByRole('dialog').getByRole('button', { name: 'Choose this route' }).isDisabled(), 'a field that is not open cannot be chosen');
+    // F-I: Paths only. No Explore and no Roadmap; paths are compared side by
+    // side and one is chosen with one explicit confirm. Nothing is chosen for
+    // the student, and asking about the chosen path is a chat draft, not a send.
+    await page.getByRole('navigation').getByRole('button', { name: 'Paths', exact: true }).click();
+    await page.getByRole('heading', { name: 'Your paths' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Explore', exact: true }).count(), 0, 'no Explore on Paths');
+    assert.equal(await page.getByRole('group', { name: 'Sections' }).count(), 0, 'Paths has no Roadmap tab');
+    for (const title of ['Practical design', 'Applied computing']) await page.getByRole('checkbox', { name: `Compare ${title}` }).check();
+    await page.getByRole('button', { name: 'Compare (2)' }).click();
+    await page.getByRole('dialog').getByText('ECAT / NET').waitFor();
+    assert.deepEqual((await called(page, 'comparePaths')).at(-1).args, [['path-one', 'path-two']], 'the table reads the picked paths');
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'See route for Pharmacy' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Choose this route' }).click();
-    await page.getByRole('region', { name: 'Your route' }).waitFor();
-    assert.deepEqual((await called(page, 'chooseRoute')).map((call) => call.args), [['pharmacy']], 'one explicit choice');
-
-    // J-K: the route's steps are ticked by the student, and a check-in opens
-    // the conversation as a draft. Nothing is sent automatically.
-    await page.getByRole('region', { name: 'Your route' }).getByRole('checkbox').first().check();
-    await page.getByText('3 of 7').waitFor();
-    assert.deepEqual((await called(page, 'setRouteStep')).at(-1).args, ['bridge', true], 'the tick is saved by step key');
+    assert.equal((await called(page, 'changePossibility')).length, 0, 'no automatic choice');
+    await page.getByRole('button', { name: 'Choose', exact: true }).nth(1).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Yes, choose it' }).click();
+    await page.getByRole('button', { name: 'Ask PAI', exact: true }).waitFor();
+    assert.deepEqual((await called(page, 'changePossibility')).map((call) => call.args), [['path-two', 'choose']], 'one explicit choice');
     const sentBefore = (await called(page, 'sendMessage')).length;
-    await page.getByRole('button', { name: 'How is it going?' }).click();
-    await page.getByRole('region', { name: 'Check-in' }).getByRole('button', { name: 'I tried something' }).click();
-    // Wait for the draft to render (the click updates React state), then check it.
-    await page.waitForFunction(() => /^I tried something\. /.test(document.querySelector('textarea[data-chat-input]')?.value || ''), null, { timeout: 5000 });
-    assert.match(await page.locator('textarea[data-chat-input]').inputValue(), /^I tried something\. /);
-    assert.equal((await called(page, 'sendMessage')).length, sentBefore, 'check-in is a draft, not an auto-send');
+    await page.getByRole('button', { name: 'Ask PAI', exact: true }).click();
+    await page.waitForFunction(() => /^I chose Applied computing\./.test(document.querySelector('textarea[data-chat-input]')?.value || ''), null, { timeout: 5000 });
+    assert.equal((await called(page, 'sendMessage')).length, sentBefore, 'Ask PAI is a draft, not an auto-send');
 
     // Vault, About you: facts read as plain rows; confirm uses the exact digest.
     await go('/student?view=profile');
@@ -167,7 +145,7 @@ module.exports = async function flow(browser, open, ORIGIN) {
       const b = await tab.boundingBox();
       assert(b && b.height >= 44 && b.width >= 44, 'tab bar target is at least 44px');
     }
-    assert.equal(await p.getByRole('navigation').last().getByRole('button').count(), 5, 'Overview, PAI, Roadmaps, Journey, Vault');
+    assert.equal(await p.getByRole('navigation').last().getByRole('button').count(), 5, 'Overview, PAI, Paths, Journey, Vault');
     // One Settings: on phones it is the gear in the top bar; the account menu
     // holds only sign-out.
     await p.getByRole('button', { name: 'Account', exact: true }).click();

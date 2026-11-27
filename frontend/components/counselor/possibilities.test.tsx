@@ -8,22 +8,22 @@ import type { Possibility } from '@/lib/possibilities';
 vi.mock('@/lib/api', () => ({ workspaceApi: { changePossibility: vi.fn(), getPossibilities: vi.fn() } }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 const value: Possibility = { id: 'candidate', title: 'Practical work', why: 'Your own project', status: 'suggested', evidence: [], unknowns: [] };
-it('offers translated student controls and calls the existing workspace API', async () => {
+it('offers translated student controls; choosing happens on Paths, never from the chat card', async () => {
   const changed = vi.fn();
-  vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...value, status: 'exploring' });
+  vi.mocked(workspaceApi.changePossibility).mockResolvedValue({ ...value, status: 'saved' });
+  const pushState = vi.spyOn(window.history, 'pushState');
   render(<I18nProvider><PossibilityCard value={value} onChange={changed} /></I18nProvider>);
-  expect(screen.getByText('Save for later')).toBeTruthy();
-  expect(screen.getByText('Not for me')).toBeTruthy();
-  fireEvent.click(screen.getByText('Explore it'));
-  await waitFor(() => expect(changed).toHaveBeenCalled());
-  expect(workspaceApi.changePossibility).toHaveBeenCalledWith('candidate', 'explore');
-});
-it('exploring has only dismiss, and chosen has no actions', () => {
-  const view = render(<I18nProvider><PossibilityCard value={{ ...value, status: 'exploring' }} onChange={vi.fn()} /></I18nProvider>);
   expect(screen.queryByText('Explore it')).toBeNull();
-  expect(screen.queryByText('Save for later')).toBeNull();
-  expect(screen.getByText('Not for me')).toBeTruthy();
-  view.rerender(<I18nProvider><PossibilityCard value={{ ...value, status: 'chosen' }} onChange={vi.fn()} /></I18nProvider>);
+  fireEvent.click(screen.getByText('Save for later'));
+  await waitFor(() => expect(changed).toHaveBeenCalled());
+  expect(workspaceApi.changePossibility).toHaveBeenCalledWith('candidate', 'save');
+  fireEvent.click(screen.getByText('Compare and choose'));
+  expect(String(pushState.mock.calls.at(-1)?.[2])).toContain('view=paths');
+  expect(workspaceApi.changePossibility).toHaveBeenCalledTimes(1);
+  pushState.mockRestore();
+});
+it('chosen has no actions', () => {
+  render(<I18nProvider><PossibilityCard value={{ ...value, status: 'chosen' }} onChange={vi.fn()} /></I18nProvider>);
   expect(screen.queryByRole('button')).toBeNull();
 });
 
@@ -47,4 +47,9 @@ it('shows the paths PAI found in chat and opens them in the workspace', async ()
   expect(window.location.pathname + window.location.search).toBe('/my-space?view=paths');
   expect(moved).toHaveBeenCalledOnce();
   window.removeEventListener('popstate', moved);
+});
+it('a dismissed path card in chat offers no Compare and choose', () => {
+  render(<I18nProvider><PossibilityCard value={{ ...value, status: 'dismissed' }} onChange={vi.fn()} /></I18nProvider>);
+  expect(screen.queryByText('Compare and choose')).toBeNull();
+  expect(screen.getByText('Save for later')).toBeTruthy();
 });

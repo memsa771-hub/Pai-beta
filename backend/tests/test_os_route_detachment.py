@@ -22,8 +22,15 @@ def test_os_routes_are_not_exposed_by_counselor_app(path):
 def test_counselor_and_os_contract_routes_stay_mounted():
     paths = {route.path for route in main.app.routes if hasattr(route, "path")}
     for prefix in ("/v1/fetch", "/v1/escalations", "/v1/student-requests", "/v1/decision-records",
-                   "/v1/counselor", "/v1/roadmap", "/v1/vault", "/v1/files"):
+                   "/v1/counselor", "/v1/vault", "/v1/files"):
         assert any(path.startswith(prefix) for path in paths), prefix
+    assert "/v1/decision-records/current" in paths
+
+
+def test_the_counselor_roadmap_routes_are_not_mounted():
+    """The route plan belongs to PAI OS; PAI C only records the chosen path."""
+    paths = {route.path for route in main.app.routes if hasattr(route, "path")}
+    assert not any(path == "/v1/roadmap" or path.startswith("/v1/roadmap/") for path in paths)
 
 
 def test_counselor_keeps_in_process_asgi_transport():

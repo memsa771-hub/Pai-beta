@@ -81,23 +81,31 @@ def test_paths_check_notes_absent_field_notes():
     assert smoke.check_paths([]) == (False, "no paths")
 
 
-def _roadmap(region="punjab", colour="green"):
-    return {"rules_as_of": "2026-09", "fields": [{
-        "title": "EE", "field_key": "electrical_engineering", "status": "open",
-        "steps": [{"key": "apply", "kind": "apply", "colour": colour, "tickable": True}],
-        "time": {"basis": [{"region": region}]}}], "chosen": None}
+def _compare(ids, statuses=("open", "step"), line="From Intermediate Pre-Engineering, 78%"):
+    return {"education_line": line,
+            "paths": [{"id": i, "field_key": f"field_{i}", "verdict": {"status": s}} for i, s in zip(ids, statuses)]}
 
 
-def test_roadmap_check():
-    assert smoke.check_roadmap(_roadmap())[0]
-    ok, note = smoke.check_roadmap(_roadmap(region="federal", colour=None))
-    assert not ok and "lack punjab" in note and "without colour" in note
+def test_eligibility_statuses_come_from_policy():
+    assert smoke.eligibility_statuses() == ["open", "step", "not_open", "unknown"]
+
+
+def test_compare_check():
+    statuses = smoke.eligibility_statuses()
+    ok, note = smoke.check_compare(_compare(["a", "b"]), ["a", "b"], statuses)
+    assert ok and "statuses ['open', 'step']" in note
+    ok, note = smoke.check_compare(_compare(["a", "b"], ("open", "maybe"), line=""), ["a", "b"], statuses)
+    assert not ok and "['maybe'] not in" in note and "no education_line" in note
+    ok, note = smoke.check_compare(_compare(["b", "a"]), ["a", "b"], statuses)
+    assert not ok and "!= asked" in note
+    ok, note = smoke.check_compare(_compare(["a"]), ["a"], statuses)
+    assert not ok and "(< 2 to compare)" in note
 
 
 def test_about_check_reads_feature_names():
     words = smoke.about_words()
-    assert {"Vault", "Mirror", "Roadmap"} <= set(words)
-    assert smoke.check_about("Aap ki baatein Vault mein jati hain aur Roadmap dikhata hai.", words)[0]
+    assert {"Vault", "Mirror", "Paths"} <= set(words) and "Roadmap" not in words
+    assert smoke.check_about("Aap ki baatein Vault mein jati hain aur Paths dikhata hai.", words)[0]
     assert not smoke.check_about("PAI helps you.", words)[0]
 
 
@@ -115,8 +123,12 @@ class FakeStack:
     """Answers the routes the smoke calls; PAI replies to each student message."""
 
     def __init__(self, reply=RU_REPLY, about="Aap ki baatein Vault mein rehti hain. Kya aur jaanna hai?"):
-        self.events, self.reply, self.about, self.chosen, self.done = [], reply, about, None, []
-        self.version = "v1"
+        self.events, self.reply, self.about, self.chosen = [], reply, about, None
+        self.version, self.compared = "v1", None
+        self.paths = [{"id": pid, "title": title, "status": status, "why": "Circuits.",
+                       "evidence": [{"text": "circuits", "evidence_level": "stated"}]}
+                      for pid, title, status in (("p1", "EE", "suggested"), ("p0", "Law", "dismissed"),
+                                                 ("p2", "CS", "saved"))]
 
     def _post(self, source, content, message_type="chat"):
         self.events.append({"id": f"e{len(self.events) + 1}", "source": source, "metadata": {},
@@ -153,21 +165,22 @@ class FakeStack:
         if route == ("GET", "/v1/counselor/summary"):
             return ok({"card": _card(version=self.version)})
         if route == ("GET", "/v1/counselor/possibilities"):
-            return ok({"possibilities": [{"title": "EE", "status": "suggested", "why": "Circuits.",
-                                          "evidence": [{"text": "circuits", "evidence_level": "stated"}]}]})
-        if route == ("GET", "/v1/roadmap"):
-            page = _roadmap()
-            if self.chosen:
-                page["chosen"] = {"field_key": self.chosen, "steps": page["fields"][0]["steps"]}
-            return ok(page)
-        if route == ("POST", "/v1/roadmap/choose"):
-            self.chosen = json["field_key"]
-            return ok({})
+            return ok({"possibilities": self.paths})
+        if route == ("GET", "/v1/counselor/possibilities/compare"):
+            assert params["network"] == "w1"
+            self.compared = list(params["ids"])
+            return ok(_compare(self.compared))
+        if method == "POST" and path.startswith("/v1/counselor/possibilities/") and path.endswith("/choose"):
+            self.chosen = path.split("/")[-2]
+            return ok({**next(p for p in self.paths if p["id"] == self.chosen), "status": "chosen"})
+        if route == ("GET", "/v1/decision-records/current"):
+            assert params["network"] == "w1"
+            if not self.chosen:
+                return ok(None)
+            return ok({"id": "d1", "possibility_id": self.chosen, "field_key": f"path:{self.chosen}",
+                       "title": "EE", "withdrawn_at": None, "live_status": "open", "workspace_id": "w1"})
         if route == ("GET", "/v1/counselor/workspace"):
             return ok({"stage": "CHOSEN" if self.chosen else "DIRECTION"})
-        if route == ("POST", "/v1/roadmap/steps"):
-            self.done.append(json["key"])
-            return ok({"steps_done": self.done})
         return Response({"detail": f"unrouted {route}"}, 404)
 
 
@@ -210,9 +223,11 @@ def test_whole_run_passes_on_a_good_stack():
     run = _run(stack, spend=_spend([1.0] + [1.1] * 40))
     assert run.passed, [(c.name, c.note) for c in run.checks if not c.ok]
     names = [c.name for c in run.checks]
-    assert names[0] == "spend baseline" and "8c tick apply step" in names and names[-1] == "9 how does PAI work"
+    assert names[0] == "spend baseline" and names[-1] == "9 how does PAI work"
+    assert names[-4:-1] == ["8a compare two paths, eligibility statuses", "8b choose -> CHOSEN",
+                            "8c decision record shows the choice"]
     assert sum(n.startswith("4.") for n in names) == 6
-    assert stack.chosen == "electrical_engineering" and stack.done == ["apply"]
+    assert stack.compared == ["p1", "p2"] and stack.chosen == "p1"  # the dismissed path is left out
     assert run.roles["counselor"]["model"] == "claude-sonnet-5-5"
     assert abs(run.spend["final"] - run.spend["baseline"] - 0.1) < 1e-9
 
@@ -299,7 +314,7 @@ def test_wait_for_settle_gives_up_at_the_timeout():
     assert not settled and waited == 12 and busy == ["memory.extract"]
 
 
-def test_run_waits_for_settle_before_vault_mirror_and_choose_and_reports_job_times(tmp_path):
+def test_run_waits_for_settle_before_vault_mirror_and_compare_and_reports_job_times(tmp_path):
     poller = Poller(2)
     clock = Clock()
     api = smoke.Api("http://fake", "tok", http=FakeStack())
@@ -308,27 +323,33 @@ def test_run_waits_for_settle_before_vault_mirror_and_choose_and_reports_job_tim
     notes = {c.name: c.note for c in run.checks}
     assert "settled in 10 s" in notes["5 vault"]
     assert "settled in 0 s" in notes["6 mirror ready, text, redrawn"]
-    assert "settled in 0 s" in notes["8b choose -> CHOSEN"]
+    assert "settled in 0 s" in notes["8a compare two paths, eligibility statuses"]
     report = smoke.write_report(run, tmp_path / "r.md")
     assert "## Latency" in report and "- 4.1 turn" in report
     assert "extractor (memory.extract) jobs: 1, median 12.0 s" in report
     assert "planner (counselor.analyze) jobs: 1, median 30.0 s" in report
 
 
-def test_choose_is_skipped_as_a_defect_when_the_mirror_is_not_ready():
+def test_compare_with_one_live_path_is_a_defect_but_the_path_is_still_chosen():
     stack = FakeStack()
-    ready = {"n": 0}
+    stack.paths = stack.paths[:2]  # EE and a dismissed path
+    run = _run(stack)
+    notes = {c.name: (c.ok, c.note) for c in run.checks}
+    ok, note = notes["8a compare two paths, eligibility statuses"]
+    assert not ok and "1 live paths (< 2 to compare)" in note
+    assert notes["8b choose -> CHOSEN"][0] and notes["8c decision record shows the choice"][0]
+    assert stack.chosen == "p1" and run.stopped is None
+
+
+def test_decision_record_not_showing_the_choice_is_a_defect():
+    stack = FakeStack()
     original = stack.request
 
     def request(method, path, **kw):
-        response = original(method, path, **kw)
-        if path == "/v1/counselor/summary":
-            ready["n"] += 1
-            if ready["n"] > 2:  # ready for the Mirror check, not when choosing
-                response._data["data"]["card"]["ready"] = False
-        return response
+        if path == "/v1/decision-records/current":
+            return Response({"code": 0, "message": "ok", "data": None})
+        return original(method, path, **kw)
     stack.request = request
     run = _run(stack)
-    choose = next(c for c in run.checks if c.name.startswith("8b"))
-    assert not choose.ok and "skipped: Mirror not ready" in choose.note
-    assert stack.chosen is None and not any(c.name.startswith("8c") for c in run.checks)
+    record = next(c for c in run.checks if c.name.startswith("8c"))
+    assert not record.ok and "decision record None" in record.note

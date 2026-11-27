@@ -7,7 +7,7 @@ table live in pai_c/policy/weaknesses.json.
 from app.pai_c.memory import entry_ref, vault_catalog
 from app.pai_c.paths.fields import current_education
 from app.pai_c.policy.controller import load_data
-from app.pai_c.roadmap.engine import marks_percent
+from app.pai_c.paths.eligibility import marks_percent
 
 
 def _percent(value: dict, grades: dict) -> tuple[float | None, str | None]:
@@ -37,7 +37,7 @@ def _scored(rows: list, policy: dict) -> dict:
 
 
 def _education_order(rows: list) -> list[str]:
-    """Education record ids: the one paths and the roadmap read first, then the rest newest first."""
+    """Education record ids: the one paths and their eligibility read first, then the rest newest first."""
     education = [row.entry for row in rows
                  if row.entry.get("kind") == "record" and row.entry.get("type") == "education"]
     first = current_education([entry["value"] for entry in education])

@@ -1,36 +1,29 @@
-"""The roadmap engine: for each live path, can the student get in from their
-current education (open / step / not_open / unknown), and what stands between.
+"""Can the student get into a path's study field from their current education
+(open / step / not_open / unknown), and what stands between. Shown in the
+Paths Compare table; the Mirror and the weak-subject reading share the
+standing helpers.
 
 Pure and deterministic: no model call and no chat input, so the same Vault and
-paths always give the same page, and a Vault or path change shows on the next
-read (no jobs, nothing goes stale). Eligibility comes only from education
-(spec ROADMAP_ENGINE_SPEC.md §2, option A): budget and city never decide.
-Reasons are copy keys with values; the English lives in policy/roadmap.json so
-the API and the page render the same words.
+paths always give the same answer, and a Vault change shows on the next read.
+Eligibility comes only from education: budget and city never decide. It
+informs the student; it never stops them from choosing a path. Reasons are copy
+keys with values; the English lives in policy/eligibility.json so the API and
+the page render the same words.
 """
 
 from dataclasses import asdict, dataclass, field
-from datetime import date
 from functools import lru_cache
 
 from app.pai_c.memory import MemoryService, vault_catalog
+from app.pai_c.paths.admission import Rule, grade_list, ibcc_percent, rule_for, rules_as_of
 from app.pai_c.paths.fields import (candidate_fields, current_education, education_readable, group_rules,
                                     known_groups, read_education, student_groups, study_fields)
 from app.pai_c.policy.controller import load_data
-from app.pai_c.possibilities import PossibilityService
-from app.pai_c.roadmap.rules import Rule, grade_list, ibcc_percent, rule_for, rules_as_of
-
-TIMED = {"open", "step"}
-
-
-def calendar_as_of() -> str | None:
-    from app.pai_c.roadmap.calendar import calendar
-    return calendar().get("as_of")
 
 
 @lru_cache(maxsize=1)
-def roadmap_policy() -> dict:
-    return load_data("roadmap.json")
+def eligibility_policy() -> dict:
+    return load_data("eligibility.json")
 
 
 @dataclass(frozen=True)
@@ -45,7 +38,7 @@ class Standing:
 @dataclass(frozen=True)
 class Need:
     """One thing between the student and the field: kind is marks, bridge,
-    check or group; detail carries its values for the route checklist."""
+    check or group; detail carries its values."""
     kind: str
     detail: dict = field(default_factory=dict)
 
@@ -187,9 +180,10 @@ def _choose_group(field_key: str, level: str) -> tuple:
 
 
 def verdict(field_key: str | None, standing: Standing) -> Verdict:
-    """Status and route facts for one field from the student's standing; the
-    order of checks is the verdict table of the spec."""
-    order = roadmap_policy()["status_order"]
+    """Status and entry facts for one field from the student's standing; the
+    order of checks is: no rule, a degree student, no readable education,
+    before intermediate, then each of the student's groups (the best wins)."""
+    order = eligibility_policy()["status_order"]
     rule = rule_for(field_key) if field_key in study_fields() else None
     rules = group_rules()
     if rule is None:
@@ -206,11 +200,9 @@ def verdict(field_key: str | None, standing: Standing) -> Verdict:
     return Verdict(status=status, reasons=reasons, needs=needs, **_facts(rule, field_key, standing))
 
 
-# ---- the page -------------------------------------------------------------------
-
 def education_line(standing: Standing) -> dict | None:
-    """The header line as data: level, group (or a degree's field) and percent
-    with their catalog labels; roadmap.json education_line renders it."""
+    """The student's education as data: level, group (or a degree's field) and
+    percent with their catalog labels; eligibility.json education_line renders it."""
     if standing.level is None:
         return None
     rules = group_rules()
@@ -225,57 +217,27 @@ def education_line(standing: Standing) -> dict | None:
             "groups": groups, "percent": standing.percent}
 
 
-class RoadmapEngine:
-    def __init__(self, db):
-        self.db = db
+# ---- the Compare table ----------------------------------------------------------
 
-    def _education(self, workspace_id: str) -> list[dict]:
-        # Read exactly as the path analyzer does, so paths and roadmap agree.
-        return [card for card in MemoryService(self.db).profile_cards(workspace_id) if card["kind"] == "education"]
+def education_records(db, workspace_id: str) -> list[dict]:
+    """The Vault education records, read exactly as the path analyzer reads
+    them, so paths and their eligibility agree."""
+    return [card["value"] for card in MemoryService(db).profile_cards(workspace_id) if card["kind"] == "education"]
 
-    def build(self, workspace_id: str, today: date | None = None) -> dict:
-        """The page. `today` is the request day (routers pass date.today());
-        every card's steps and time estimate are read against it."""
-        from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys, serialize
-        from app.pai_c.roadmap.calendar import region_for
-        from app.pai_c.roadmap.steps import route_steps
-        from app.pai_c.roadmap.timeline import estimate
-        today = today or date.today()
-        education = self._education(workspace_id)
-        records = [card["value"] for card in education]
-        standing = student_standing(records)
-        # The steps read the very record the standing was read from.
-        current = current_education(records)
-        current_id = next((card["id"] for card in education if card["value"] is current), None)
-        rows = MemoryService(self.db).vault_rows(workspace_id)
-        # Board first, then the city the student lives in (the Vault fact), else federal.
-        # Read the city as the Mirror header reads a fact: its display text.
-        city = next((row.entry.get("display") for row in rows if row.entry.get("kind") == "fact"
-                     and row.entry.get("type") == "location.current_city"), None)
-        region = region_for(current, city if isinstance(city, str) else None)
-        decision = RouteDecisionService(self.db).active(workspace_id)
-        order = roadmap_policy()["status_order"]
-        cards = []
-        for row in PossibilityService(self.db).list(workspace_id):
-            if row.status == "dismissed":
-                continue
-            field_key = (row.study_field or {}).get("key")
-            study = study_fields().get(field_key) if field_key else None
-            result = verdict(field_key, standing)
-            card = {"possibility_id": row.id, "field_key": field_key,
-                    "title": study.title if study else row.title,
-                    "family": study.family if study else None, "why": row.why,
-                    "status": result.status, "verdict": asdict(result)}
-            ticks = done_keys(decision) if decision is not None and decision.field_key == field_key else ()
-            card["steps"] = route_steps(card, standing, rows, today=today, steps_done=ticks,
-                                        record=current, record_id=current_id)
-            # Only a field the student can enter has a time to entry.
-            card["time"] = (estimate(card["steps"], field_key, today, region)
-                            if result.status in TIMED and card["steps"] else None)
-            cards.append(card)
-        cards.sort(key=lambda card: order.index(card["status"]))  # stable: path order within a status
-        counts = {status: sum(card["status"] == status for card in cards) for status in order}
-        return {"education_line": education_line(standing), "standing": asdict(standing),
-                "counts": counts, "fields": cards, "rules_as_of": rules_as_of(),
-                "calendar_as_of": calendar_as_of(),
-                "chosen": serialize(decision, cards) if decision is not None else None}
+
+def compare(db, workspace_id: str, possibility_ids: list[str]) -> dict:
+    """The Compare table: each asked-for live path's verdict, in the order
+    asked, with when the admission rules were last checked (every rule fact
+    shows its sources and confidence). Ids that are not the student's live
+    paths are left out."""
+    from app.pai_c.possibilities import PossibilityService
+    standing = student_standing(education_records(db, workspace_id))
+    rows = {row.id: row for row in PossibilityService(db).list(workspace_id) if row.status != "dismissed"}
+    paths = []
+    for possibility_id in list(dict.fromkeys(possibility_ids))[:50]:
+        row = rows.get(possibility_id)
+        if row is None:
+            continue
+        field_key = (row.study_field or {}).get("key")
+        paths.append({"id": row.id, "field_key": field_key, "verdict": asdict(verdict(field_key, standing))})
+    return {"education_line": education_line(standing), "rules_as_of": rules_as_of(), "paths": paths}

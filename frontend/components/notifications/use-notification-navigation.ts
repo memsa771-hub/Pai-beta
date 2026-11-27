@@ -11,9 +11,9 @@ export function useNotificationNavigation() {
 
   return (item: NotificationItem) => {
     const read = item.isRead ? Promise.resolve() : markNotificationRead(item.id);
-    // Older notifications from the removed roadmap research open the Roadmap page.
+    // Older notifications from the removed roadmap research open Paths.
     if (item.createdBy === 'system:roadmaps') {
-      openView('roadmap');
+      openView('paths');
     } else if (item.channelName && sessions.some((session) => session.sessionId === item.channelName)) {
       setCurrentSessionId(item.channelName);
       openView('threads');

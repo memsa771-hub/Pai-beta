@@ -1,10 +1,14 @@
-"""Guard: the chat-linked roadmap system stays removed (ROADMAP_ENGINE_SPEC.md §4).
+"""Guard: the roadmap stays out of PAI C.
 
-Routes come only from the deterministic engine and the Roadmap page; nothing in
-chat, the reconciler or the old /v1/roadmaps API may build or change one.
+The chat-linked roadmap system (ROADMAP_ENGINE_SPEC.md §4) and then the
+Counselor Roadmap page are removed: the student compares and chooses on the
+Paths page, and the route plan belongs to PAI OS. Nothing in chat, the
+reconciler, the old /v1/roadmaps API or the /v1/roadmap API may build or change
+a route. The step, timeline and calendar modules are kept for PAI OS reuse.
 """
 
 import ast
+import importlib
 import importlib.util
 from pathlib import Path
 from uuid import uuid4
@@ -20,7 +24,12 @@ from scripts.counselor_eval_support import StudentSession
 BACKEND = Path(__file__).resolve().parents[1]
 TOKEN = {"X-Workspace-Token": "synthetic-test-only"}
 REMOVED_MODULES = ("app.pai_c.roadmaps", "app.plugins.roadmap_builder", "app.pai_c.deep.roadmaps",
-                   "app.research.light", "app.routers.roadmaps")
+                   "app.research.light", "app.routers.roadmaps",
+                   # The Counselor Roadmap page (engine, route decisions and its router).
+                   "app.pai_c.roadmap.engine", "app.pai_c.roadmap.decisions", "app.pai_c.roadmap.rules",
+                   "app.routers.roadmap")
+KEPT_FOR_OS = ("app.pai_c.roadmap.steps", "app.pai_c.roadmap.timeline", "app.pai_c.roadmap.calendar")
+POLICY = BACKEND / "app" / "pai_c" / "policy"
 
 
 @pytest.fixture
@@ -130,3 +139,83 @@ class _NoLockDb:
 
     def get_bind(self):
         return type("Bind", (), {"dialect": type("Dialect", (), {"name": "sqlite"})()})()
+
+
+# ---- the Counselor Roadmap page is gone -------------------------------------------
+
+@pytest.mark.parametrize("method,path", [
+    ("get", "/v1/roadmap"), ("post", "/v1/roadmap/choose"),
+    ("post", "/v1/roadmap/steps"), ("post", "/v1/roadmap/withdraw"),
+])
+def test_roadmap_page_api_is_gone(client_for_student, method, path):
+    client, _, params = client_for_student
+    kwargs = {"params": params, "headers": TOKEN}
+    if method == "post":
+        kwargs["json"] = {"field_key": "computer_science", "index": 0, "done": True}
+    assert getattr(client, method)(path, **kwargs).status_code in {404, 405}, path
+    assert not any(getattr(route, "path", "") == path for route in app.routes), path
+
+
+def test_decision_record_route_stays(client_for_student):
+    client, _, params = client_for_student
+    response = client.get("/v1/decision-records/current", params=params, headers=TOKEN)
+    assert response.status_code == 200, response.text
+    assert response.json()["data"] is None  # nothing chosen yet
+
+
+@pytest.mark.parametrize("name", KEPT_FOR_OS)
+def test_step_timeline_and_calendar_modules_are_kept_for_os(name):
+    assert importlib.util.find_spec(name) is not None, name
+    importlib.import_module(name)
+
+
+def test_kept_steps_module_reads_its_own_policy():
+    from app.pai_c.roadmap.steps import roadmap_policy
+    assert roadmap_policy()  # loads policy/roadmap.json, which stays for PAI OS
+    assert (POLICY / "roadmap.json").is_file() and (POLICY / "academic_calendar.json").is_file()
+
+
+def _imports(path):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            yield from (alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if node.level:  # relative: resolve against the file's package
+                package = path.relative_to(BACKEND).with_suffix("").parts[:-node.level]
+                module = ".".join([*package, module] if module else package)
+            yield module
+            yield from (f"{module}.{alias.name}" for alias in node.names)
+
+
+def test_nothing_in_pai_c_imports_the_kept_roadmap_modules():
+    """The kept modules wait for PAI OS; no app module outside them uses them."""
+    roadmap_dir = BACKEND / "app" / "pai_c" / "roadmap"
+    offenders = sorted({str(path.relative_to(BACKEND))
+                        for path in (BACKEND / "app").rglob("*.py")
+                        if roadmap_dir not in path.parents
+                        for name in _imports(path)
+                        if name == "app.pai_c.roadmap" or name.startswith("app.pai_c.roadmap.")})
+    assert offenders == []
+
+
+def _policy(name):
+    import json
+    return json.loads((POLICY / name).read_text(encoding="utf-8"))
+
+
+def test_no_roadmap_place_step_or_feature_in_the_counselor_copy():
+    import json
+    places = _policy("workspace_places.json")["places"]
+    assert "roadmap" not in places and "paths" in places
+    steps = _policy("next_steps.json")
+    for name, phase in steps["phases"].items():
+        assert phase["place"] in places, name
+        assert phase["place"] != "roadmap" and "step_line" not in phase, name
+    assert steps["phases"]["proposed"]["place"] == steps["phases"]["chosen"]["place"] == "paths"
+    about = _policy("about_pai.json")
+    assert not any("roadmap" in key.lower() for key in about["features"])
+    assert "Paths" in about["features"]
+    for name in ("workspace_places.json", "next_steps.json", "about_pai.json"):
+        text = json.dumps(_policy(name)).lower()
+        assert "roadmap page" not in text and '"roadmap"' not in text, name

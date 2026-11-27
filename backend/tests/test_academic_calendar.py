@@ -9,8 +9,8 @@ import pytest
 from app.pai_c.memory import vault_catalog
 from app.pai_c.paths.fields import study_fields
 from app.pai_c.roadmap import calendar as cal
-from app.pai_c.roadmap.engine import roadmap_policy
-from app.pai_c.roadmap.rules import _data as admission_data
+from app.pai_c.paths.admission import _data as admission_data
+from app.pai_c.roadmap.steps import roadmap_policy
 
 
 def entries():

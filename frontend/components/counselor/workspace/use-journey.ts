@@ -3,7 +3,6 @@ import { useCallback } from "react";
 import { workspaceApi } from "@/lib/api";
 import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
-import type { RoadmapPage } from "@/lib/roadmap";
 import { useResource } from "./resource";
 import copy from "./copy.json";
 
@@ -11,9 +10,6 @@ export type Stage = (typeof copy.stages)[number];
 export type JourneySignals = {
   picture: LivingPicture;
   possibilities: Possibility[];
-  /** A places (program) search finished on at least one path. */
-  placesSearched: boolean;
-  roadmap: RoadmapPage | null;
 };
 
 /** Whether a stage's signal (named in copy.json) is satisfied. Signals only
@@ -26,18 +22,8 @@ export function signalMet(signal: string, data: JourneySignals): boolean {
   const live = data.possibilities.filter((p) => p.status !== "dismissed");
   if (signal === "paths_found") return live.length > 0;
   if (signal === "path_explored") return live.some((p) => p.status === "exploring" || p.status === "chosen");
-  if (signal === "places_searched") return data.placesSearched;
-  // The Roadmap page: a route the student chose, then a first step ticked.
-  // Cards alone reach nothing: they exist as soon as paths do.
-  if (signal === "route_chosen") return !!data.roadmap?.chosen;
-  // Only a tick the page honours counts: on a step the student may tick, or
-  // one now done. A legacy stored tick on a step the Vault speaks for (shown
-  // as not done) is not progress.
-  if (signal === "route_step_done") {
-    const chosen = data.roadmap?.chosen;
-    const ticks = new Set(chosen?.steps_done || []);
-    return !!chosen?.steps.some((step) => ticks.has(step.key) && (step.tickable || step.status === "done"));
-  }
+  // A path the student chose on the Paths page.
+  if (signal === "route_chosen") return live.some((p) => p.status === "chosen");
   return false;
 }
 
@@ -61,20 +47,12 @@ export function journeyProgress(data: JourneySignals) {
 
 /** Optional signals: a failed read leaves that stage unreached, never broken. */
 const settle = <T,>(read: () => Promise<T>, fallback: T) => Promise.resolve().then(read).catch(() => fallback);
-/** Places can be searched only on a path the student explored, so only those
- * are asked; GET never starts a search. */
-const anyPlacesSearched = async (possibilities: Possibility[]) => {
-  const explored = possibilities.filter((p) => p.status === "exploring" || p.status === "saved" || p.status === "chosen");
-  const results = await Promise.all(explored.map((p) => settle(() => workspaceApi.getPrograms(p.id), null)));
-  return results.some((result) => result?.status === "completed");
-};
 const loadJourney = async (): Promise<JourneySignals> => {
-  const [picture, possibilities, roadmap] = await Promise.all([
+  const [picture, possibilities] = await Promise.all([
     workspaceApi.getCounselorWorkspace(),
     settle(() => workspaceApi.getPossibilities(), [] as Possibility[]),
-    settle(() => workspaceApi.getRoadmapPage(), null as RoadmapPage | null),
   ]);
-  return { picture, possibilities, placesSearched: await anyPlacesSearched(possibilities), roadmap };
+  return { picture, possibilities };
 };
 
 export function useJourney() {

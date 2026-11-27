@@ -1,8 +1,8 @@
-"""The journey stage follows the route decision (ROADMAP_ENGINE_SPEC.md §3).
+"""The journey stage follows the chosen path (pai_route_decisions).
 
-The engine computes routes on read, so there is no research wait: the Mirror
-becoming ready moves DIRECTION to MIRROR and the first saved paths move it to
-PROPOSED (FOUR_FEATURES_SPEC 2.4), choosing a route moves to CHOSEN,
+There is no research wait: the Mirror becoming ready moves DIRECTION to MIRROR
+and the first saved paths move it to PROPOSED (FOUR_FEATURES_SPEC 2.4),
+choosing a path on the Paths page moves to CHOSEN,
 withdrawing goes back to PROPOSED, and chat `rethink` moves only the stage.
 Every test starts from those real moves, not a forced stage.
 """
@@ -20,9 +20,10 @@ from app.journey import JourneyService
 from app.main import app
 from app.models import RouteDecision, StudentJourney
 from app.pai_c.journey_sync import sync_counselor_stage
+from app.pai_c.paths.choice import PathChoiceService
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import client_for, prepare
-from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
+from tests.test_path_eligibility import add_education, add_path, field_title, fsc
 
 TOKEN = {"X-Workspace-Token": "synthetic-test-only"}
 
@@ -51,16 +52,22 @@ def stage(db, journey_id):
 
 
 def with_routes(student, db):
+    """Two choosable paths; returns {field_key: possibility id}."""
     add_education(student, db, fsc("pre_engineering", 78))
-    for key in ("electrical_engineering", "computer_engineering"):
-        add_path(student, db, field_title(key), key)
+    return {key: add_path(student, db, field_title(key), key).id
+            for key in ("electrical_engineering", "computer_engineering")}
 
 
-def choose(client, student, field_key):
-    response = client.post("/v1/roadmap/choose", params={"network": student.workspace_id}, headers=TOKEN,
-                           json={"field_key": field_key})
+def choose(client, student, possibility_id):
+    """Choose on the Paths page (the HTTP route), then read the decision record."""
+    response = client.post(f"/v1/counselor/possibilities/{possibility_id}/choose",
+                           params={"network": student.workspace_id}, headers=TOKEN)
     assert response.status_code == 200, response.text
-    return response.json()["data"]
+    assert response.json()["data"]["id"] == possibility_id
+    with student.factory() as fresh:
+        decision = PathChoiceService(fresh).current(student.workspace_id)
+    assert decision is not None and decision["possibility_id"] == possibility_id
+    return decision
 
 
 @pytest.mark.asyncio
@@ -72,8 +79,8 @@ async def test_ready_mirror_and_first_paths_propose():
 @pytest.mark.asyncio
 async def test_choose_moves_to_chosen_and_records_the_goal():
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        decision = choose(client, student, "electrical_engineering")
+        ids = with_routes(student, db)
+        decision = choose(client, student, ids["electrical_engineering"])
         assert stage(db, journey_id) == "CHOSEN"
         row = db.get(StudentJourney, journey_id)
         assert row.current_objective == decision["title"]
@@ -82,7 +89,7 @@ async def test_choose_moves_to_chosen_and_records_the_goal():
         assert row.decisions[-1]["kind"] == "route_choice"
         assert row.decisions[-1]["route_decision_id"] == decision["id"]
         # Choosing another keeps CHOSEN and points the goal at the new route.
-        second = choose(client, student, "computer_engineering")
+        second = choose(client, student, ids["computer_engineering"])
         assert stage(db, journey_id) == "CHOSEN"
         assert db.get(StudentJourney, journey_id).active_goal["route_decision_id"] == second["id"]
 
@@ -90,9 +97,10 @@ async def test_choose_moves_to_chosen_and_records_the_goal():
 @pytest.mark.asyncio
 async def test_withdraw_returns_to_proposed_and_clears_the_goal():
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        decision = choose(client, student, "electrical_engineering")
-        response = client.post("/v1/roadmap/withdraw", params={"network": student.workspace_id}, headers=TOKEN)
+        ids = with_routes(student, db)
+        decision = choose(client, student, ids["electrical_engineering"])
+        response = client.post(f"/v1/counselor/possibilities/{ids['electrical_engineering']}/withdraw",
+                               params={"network": student.workspace_id}, headers=TOKEN)
         assert response.status_code == 200, response.text
         assert stage(db, journey_id) == "PROPOSED"
         row = db.get(StudentJourney, journey_id)
@@ -103,8 +111,8 @@ async def test_withdraw_returns_to_proposed_and_clears_the_goal():
 @pytest.mark.asyncio
 async def test_os_escalation_works_after_a_choice():
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        choose(client, student, "electrical_engineering")
+        ids = with_routes(student, db)
+        choose(client, student, ids["electrical_engineering"])
         body = {"workspace_id": student.workspace_id, "journey_id": journey_id,
                 "reason_type": "blocking_gap", "details": "Intake has closed"}
         with patch.object(config, "PAI_OS_SERVICE_TOKEN", "local-test-token"):
@@ -120,8 +128,8 @@ async def test_chat_rethink_moves_to_direction_and_keeps_the_route():
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from app.pai_c.deep.turn_input import CounselorTurnInput
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        decision = choose(client, student, "electrical_engineering")
+        ids = with_routes(student, db)
+        decision = choose(client, student, ids["electrical_engineering"])
         journey = JourneyService(db).get(student.workspace_id, journey_id)
         turn = CounselorTurnInput("channel/pai-counselor", student.workspace_id, "Not sure any more",
                                   (), None, str(uuid4()), student.next_timestamp(), f"human:{student.user_id}", False)
@@ -139,8 +147,8 @@ async def test_a_journey_stuck_in_old_research_stages_can_still_choose(stuck):
         # Journeys from before migration 121 may still be in the old research wait.
         db.get(StudentJourney, journey_id).current_stage = stuck
         db.commit()
-        with_routes(student, db)
-        choose(client, student, "electrical_engineering")
+        ids = with_routes(student, db)
+        choose(client, student, ids["electrical_engineering"])
         assert stage(db, journey_id) == "CHOSEN"
 
 
@@ -149,10 +157,10 @@ async def test_choose_before_the_mirror_leaves_the_stage_alone():
     with StudentSession() as student, student.factory() as db:
         journey = JourneyService(db).ensure_counselor(student.workspace_id)
         db.commit()
-        with_routes(student, db)
+        ids = with_routes(student, db)
         client = client_for(student)
         try:
-            choose(client, student, "electrical_engineering")
+            choose(client, student, ids["electrical_engineering"])
         finally:
             app.dependency_overrides.pop(get_db, None)
         assert stage(db, journey.id) == "IDENTITY"
@@ -168,13 +176,41 @@ def assert_chosen_with_goal(db, journey_id, decision):
 @pytest.mark.asyncio
 async def test_choosing_again_records_the_replaced_route_as_withdrawn():
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        first = choose(client, student, "electrical_engineering")
-        second = choose(client, student, "computer_engineering")
+        ids = with_routes(student, db)
+        first = choose(client, student, ids["electrical_engineering"])
+        second = choose(client, student, ids["computer_engineering"])
         db.expire_all()
         kinds = [(item["kind"], item["route_decision_id"]) for item in db.get(StudentJourney, journey_id).decisions]
         assert kinds[-3:] == [("route_choice", first["id"]), ("route_withdrawn", first["id"]),
                               ("route_choice", second["id"])]
+
+
+@pytest.mark.asyncio
+async def test_choosing_the_chosen_path_again_changes_nothing():
+    async with confirmed_student() as (client, student, db, journey_id):
+        ids = with_routes(student, db)
+        first = choose(client, student, ids["electrical_engineering"])
+        db.expire_all()
+        before = list(db.get(StudentJourney, journey_id).decisions)
+        again = choose(client, student, ids["electrical_engineering"])
+        assert again["id"] == first["id"]
+        db.expire_all()
+        assert db.get(StudentJourney, journey_id).decisions == before
+        assert len(db.scalars(select(RouteDecision).where(
+            RouteDecision.workspace_id == student.workspace_id)).all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_choosing_another_path_puts_the_replaced_one_back_to_saved():
+    from app.pai_c.possibilities import PossibilityService
+    async with confirmed_student() as (client, student, db, journey_id):
+        ids = with_routes(student, db)
+        choose(client, student, ids["electrical_engineering"])
+        choose(client, student, ids["computer_engineering"])
+        db.expire_all()
+        service = PossibilityService(db)
+        assert service.get(student.workspace_id, ids["electrical_engineering"]).status == "saved"
+        assert service.get(student.workspace_id, ids["computer_engineering"]).status == "chosen"
 
 
 @pytest.mark.asyncio
@@ -187,8 +223,8 @@ async def test_rethink_holds_until_the_student_chooses_again():
     from app.pai_c.deep.notebook_schema import CounselorNotebookData
     from app.pai_c.deep.turn_input import CounselorTurnInput
     async with confirmed_student() as (client, student, db, journey_id):
-        with_routes(student, db)
-        choose(client, student, "electrical_engineering")
+        ids = with_routes(student, db)
+        choose(client, student, ids["electrical_engineering"])
         journey = JourneyService(db).get(student.workspace_id, journey_id)
         turn = CounselorTurnInput("channel/pai-counselor", student.workspace_id, "Not sure any more",
                                   (), None, str(uuid4()), student.next_timestamp(), f"human:{student.user_id}", False)
@@ -201,7 +237,7 @@ async def test_rethink_holds_until_the_student_chooses_again():
             sync_counselor_stage(db, student.workspace_id, reason=reason)
             db.commit()
             assert stage(db, journey_id) == "DIRECTION", reason
-        decision = choose(client, student, "computer_engineering")
+        decision = choose(client, student, ids["computer_engineering"])
         assert_chosen_with_goal(db, journey_id, decision)
         assert db.get(StudentJourney, journey_id).replan_at is None
 
@@ -210,10 +246,10 @@ async def test_rethink_holds_until_the_student_chooses_again():
 async def test_route_chosen_before_the_mirror_is_chosen_once_paths_arrive():
     with StudentSession() as student, student.factory() as db:
         _, journey, _ = prepare(student, db)
-        with_routes(student, db)
+        ids = with_routes(student, db)
         client = client_for(student)
         try:
-            decision = choose(client, student, "electrical_engineering")
+            decision = choose(client, student, ids["electrical_engineering"])
             assert stage(db, journey.id) == "DIRECTION"
             JourneyService(db).mark_mirror_ready(student.workspace_id)
             sync_counselor_stage(db, student.workspace_id, reason="student")

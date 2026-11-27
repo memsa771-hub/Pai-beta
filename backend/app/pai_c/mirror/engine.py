@@ -6,8 +6,8 @@ out of date and nothing waits for it. It is a view over three things that
 already exist: the coverage areas (which Vault entries cover which area, and
 whether the area is known), the Vault view (each entry's English display text
 in catalog labels, evidence level, source and date; never the evidence quote),
-and the roadmap engine's reading of the education record (level, group,
-percent), so the Mirror and the roadmap describe the same student.
+and the Paths eligibility check's reading of the education record (level,
+group, percent), so the Mirror and Paths describe the same student.
 
 Levels, readiness, tension rules, source labels and copy live in
 policy/mirror.json. The only model output on the card is the stored text the
@@ -23,7 +23,7 @@ from app.pai_c.completeness import completeness_from
 from app.pai_c.memory import MemoryService, entry_ref, vault_catalog
 from app.pai_c.paths.fields import current_education, study_fields
 from app.pai_c.policy.controller import at_path, load_data
-from app.pai_c.roadmap.engine import education_line, marks_percent, student_standing
+from app.pai_c.paths.eligibility import education_line, marks_percent, student_standing
 from app.pai_c.understanding.weak_subjects import weak_subjects
 
 _SENTENCE_END = re.compile(r"(?<=[.!])\s+(?=\S)")
@@ -224,7 +224,7 @@ class MirrorEngine:
 
     @staticmethod
     def _education_line(standing) -> dict | None:
-        """The roadmap engine's education line plus its English text."""
+        """The eligibility check's education line plus its English text."""
         line = education_line(standing)
         if line is None:
             return None

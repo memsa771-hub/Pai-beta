@@ -14,8 +14,6 @@ const path = (id: string, title: string, status: Possibility["status"]) =>
 const data: JourneySignals = {
   picture,
   possibilities: [path("p1", "Practical design", "suggested"), path("p2", "Applied computing", "saved"), path("p3", "Old idea", "dismissed")],
-  placesSearched: false,
-  roadmap: null,
 };
 const journey = { data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) };
 
@@ -25,7 +23,7 @@ it("shows signals from the student's own data and never a score", async () => {
   render(<Overview journey={journey} navigate={navigate} openPath={openPath} onChat={onChat} />);
   expect(screen.getByRole("heading", { level: 1, name: "Find the path that fits you." })).toBeTruthy();
   // Dismissed paths do not count.
-  expect(screen.getByText("Paths to explore").parentElement?.textContent).toContain("2");
+  expect(screen.getByText("Your paths").parentElement?.textContent).toContain("2");
   const paths = screen.getByRole("region", { name: "Your strongest paths" });
   expect(within(paths).queryByText("Old idea")).toBeNull();
   fireEvent.click(within(paths).getByRole("button", { name: /Practical design/ }));
@@ -64,4 +62,22 @@ it("says PAI needs a little more before the Mirror is ready", async () => {
   render(<Overview journey={{ ...journey, data: early, progress: journeyProgress(early) }} navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
   const card = screen.getByRole("region", { name: "Your Mirror" });
   expect(within(card).getByText("PAI needs a little more to draw your picture.")).toBeTruthy();
+});
+
+it("once a path is chosen, the path recommendation asks PAI about it instead of choosing again", async () => {
+  vi.mocked(workspaceApi.getVault).mockResolvedValue(vault);
+  const chosen: JourneySignals = { picture, possibilities: [path("p1", "Practical design", "chosen"), path("p2", "Applied computing", "saved")] };
+  const onChat = vi.fn();
+  render(<Overview journey={{ ...journey, data: chosen, progress: journeyProgress(chosen) }} navigate={vi.fn()} openPath={vi.fn()} onChat={onChat} />);
+  expect(document.body.textContent).toContain("Ask PAI about Practical design");
+  expect(document.body.textContent).not.toContain("Compare your paths and choose one");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Next recommendation" })).toBeTruthy());
+  // The pager animates between recommendations, so wait after each step.
+  for (let i = 0; i < 4 && !screen.queryByRole("heading", { name: "Ask PAI about Practical design." }); i++) {
+    fireEvent.click(screen.getByRole("button", { name: "Next recommendation" }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  expect(await screen.findByRole("heading", { name: "Ask PAI about Practical design." })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Ask PAI" }));
+  expect(onChat).toHaveBeenCalledWith("I chose Practical design. Tell me more about this path.");
 });

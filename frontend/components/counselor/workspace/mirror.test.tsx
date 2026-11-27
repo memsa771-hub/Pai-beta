@@ -181,7 +181,7 @@ it("gives every Mirror action a 44px target", async () => {
   render(<MirrorLink header={mirrorCard.header} />);
   expect(screen.getByRole("button", { name: "Open your Mirror" }).className).toMatch(tap);
   cleanup();
-  const data = { picture, possibilities: [], placesSearched: false, roadmap: null } as JourneySignals;
+  const data = { picture, possibilities: [] } as JourneySignals;
   render(<Overview journey={{ data, error: false, busy: false, refresh: vi.fn(), progress: journeyProgress(data) }}
     navigate={vi.fn()} openPath={vi.fn()} onChat={vi.fn()} />);
   expect(within(screen.getByRole("region", { name: "Your Mirror" })).getByRole("button", { name: "Open your Mirror" }).className).toMatch(tap);

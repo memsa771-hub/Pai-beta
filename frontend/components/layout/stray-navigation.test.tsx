@@ -35,5 +35,5 @@ it('audit #12: the saved view still opens once, as the workspace first opens', (
   const { rerender } = renderHook(useDesktopWorkspaceState);
   rerender();
   expect(state.openView).toHaveBeenCalledTimes(1);
-  expect(state.openView).toHaveBeenCalledWith('roadmap');
+  expect(state.openView).toHaveBeenCalledWith('paths');
 });

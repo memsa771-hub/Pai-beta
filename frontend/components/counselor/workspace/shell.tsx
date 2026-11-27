@@ -14,8 +14,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { LivingProfile } from "./profile";
 import { Journey } from "./journey";
-import { Paths, PathPage, ProgramPage } from "./paths";
-import { Roadmap } from "./roadmap";
+import { Paths } from "./paths";
 import { CounselorSettings } from "./settings";
 import { DocumentsView } from "./documents";
 import { Overview } from "./overview";
@@ -36,9 +35,7 @@ export function CounselorShell() {
   const { viewMode, openView } = useLayout();
   const { currentSessionId, setCurrentSessionId } = useWorkspace();
   const [draft, setDraft] = useState("");
-  const [path, setPath] = useState<string | null>(null),
-    [places, setPlaces] = useState(false),
-    [base, setBase] = useState(""),
+  const [base, setBase] = useState(""),
     [collapsed, setCollapsed] = useState(false),
     [command, setCommand] = useState(false);
   const diagnostic = useResource(health);
@@ -52,8 +49,6 @@ export function CounselorShell() {
     try { setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1"); } catch { /* storage blocked */ }
     const read = () => {
       const q = new URLSearchParams(window.location.search);
-      setPath(q.get("path"));
-      setPlaces(q.get("stage") === "H");
       const raw = q.get("view") || "threads";
       const requested = ALIASES[raw] || raw;
       openView(
@@ -86,23 +81,12 @@ export function CounselorShell() {
     setDraft("");
     // Moments, paths and choices change as the student works; keep the stage fresh.
     void journey.refresh();
-    setPath(null);
-    setPlaces(false);
     const q = new URLSearchParams({ view });
     if (event) q.set("moment", event);
     window.history.pushState({}, "", `${base}?${q}`);
   };
-  const openPath = (id: string) => {
-    void journey.refresh();
-    openView("paths");
-    setPath(id);
-    setPlaces(false);
-    window.history.pushState(
-      {},
-      "",
-      `${base}?view=paths&path=${encodeURIComponent(id)}`,
-    );
-  };
+  // Paths are compared and chosen on the one Paths page; there is no page per path.
+  const openPath = () => navigate("paths");
   const chat = (topic?: string) => {
     navigate("threads");
     setDraft(topic || "");
@@ -134,33 +118,7 @@ export function CounselorShell() {
           {active === "profile" && <LivingProfile onChat={chat} onNavigate={navigate} stage={journey.progress?.stage} />}
           {active === "journey" && <Journey navigate={navigate} journey={journey} onChat={chat} />}
           {active === "mirror" && <Mirror onChat={chat} />}
-          {active === "paths" &&
-            (path ? (
-              places ? (
-                <ProgramPage
-                  id={path}
-                  onBack={() => setPlaces(false)}
-                  onRoadmap={() => navigate("roadmap")}
-                />
-              ) : (
-                <PathPage
-                  id={path}
-                  onBack={() => navigate("paths")}
-                  onPlaces={() => {
-                    setPlaces(true);
-                    window.history.pushState(
-                      {},
-                      "",
-                      `${base}?view=paths&path=${encodeURIComponent(path)}&stage=H`,
-                    );
-                  }}
-                  onChat={chat}
-                />
-              )
-            ) : (
-              <Paths onOpen={openPath} onChat={chat} />
-            ))}
-          {active === "roadmap" && <Roadmap onNavigate={navigate} onChat={chat} onChanged={() => void journey.refresh()} />}
+          {active === "paths" && <Paths onChat={chat} onChanged={() => void journey.refresh()} />}
           {active === "settings" && <CounselorSettings base={base} onNavigate={navigate} />}
         </div>
       </div>
@@ -275,7 +233,7 @@ export function CounselorShell() {
           )}
           <main id="pai-main" className="flex min-h-0 flex-1 flex-col">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={`${active}:${path || ""}:${places}`} className="flex min-h-0 flex-1 flex-col"
+              <motion.div key={active} className="flex min-h-0 flex-1 flex-col"
                 initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}>
                 {content}

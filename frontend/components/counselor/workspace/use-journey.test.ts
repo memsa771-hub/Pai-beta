@@ -2,12 +2,12 @@
 import { it, expect, vi, beforeEach } from 'vitest';
 import { workspaceApi } from '@/lib/api';
 import { journeyProgress, signalMet, useJourney, type JourneySignals } from './use-journey';
-import { chosenRoute, picture, roadmapPage } from '@/tests/fixtures/counselor';
+import { picture } from '@/tests/fixtures/counselor';
 import copy from './copy.json';
 
 const at = (stage: string | null, moments: Record<string, string>, extra: Partial<JourneySignals> = {}) => journeyProgress({
   picture: { ...picture, stage, moments, picture: notReady },
-  possibilities: [], placesSearched: false, roadmap: null, ...extra,
+  possibilities: [], ...extra,
 } as JourneySignals);
 
 // The live audit: after six messages the Counselor had *planned* a first
@@ -36,7 +36,7 @@ it('does not cap later stages, and an unknown stage keeps the signal view', () =
 it('stage E is Your Mirror, reached when the Mirror is ready; at MIRROR the view may show F', () => {
   const stageE = copy.stages.find((s) => s.id === 'E')!;
   expect([stageE.title, stageE.view, stageE.signal]).toEqual(['Your Mirror', 'mirror', 'mirror_ready']);
-  const data = (ready: boolean) => ({ picture: { ...picture, picture: { ...picture.picture!, ready } }, possibilities: [], placesSearched: false, roadmap: null }) as JourneySignals;
+  const data = (ready: boolean) => ({ picture: { ...picture, picture: { ...picture.picture!, ready } }, possibilities: [] }) as JourneySignals;
   expect(signalMet('mirror_ready', data(true))).toBe(true);
   expect(signalMet('mirror_ready', data(false))).toBe(false);
   expect(signalMet('mirror_ready', { ...data(true), picture: { ...picture, picture: null } })).toBe(false);
@@ -45,49 +45,38 @@ it('stage E is Your Mirror, reached when the Mirror is ready; at MIRROR the view
   expect(at('MIRROR', planned, ready('MIRROR')).stage.id).toBe('F');
 });
 
-it('reads the Roadmap page: chosen when a route is chosen, J when a step is ticked', () => {
-  const data = (roadmap: JourneySignals['roadmap']) => ({ picture, possibilities: [], placesSearched: false, roadmap }) as JourneySignals;
-  expect(signalMet('route_checked', data(roadmapPage))).toBe(false); // no such signal: cards alone reach nothing
-  expect(signalMet('route_chosen', data(roadmapPage))).toBe(false);
-  expect(signalMet('route_chosen', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(true);
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: chosenRoute }))).toBe(false);
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['apply'] } }))).toBe(true);
-  // A legacy stored tick on a step the Vault speaks for (not tickable, not done) is not progress.
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['degree'] } }))).toBe(false);
-  expect(signalMet('route_step_done', data({ ...roadmapPage, chosen: { ...chosenRoute, steps_done: ['gone-step'] } }))).toBe(false);
+it('I is reached when the student chooses a path on Paths; no step ticks or places search remain', () => {
+  const path = (status: string) => ({ id: 'p', title: 'Electronics', why: '', status, evidence: [], unknowns: [] });
+  const data = (status: string) => ({ picture, possibilities: [path(status)] }) as unknown as JourneySignals;
+  expect(signalMet('route_chosen', data('saved'))).toBe(false);
+  expect(signalMet('route_chosen', data('chosen'))).toBe(true);
+  expect(signalMet('route_step_done', data('chosen'))).toBe(false); // the old step ticks are gone
+  expect(signalMet('places_searched', data('chosen'))).toBe(false); // the old places search is gone
+  const stageI = copy.stages.find((s) => s.id === 'I')!;
+  expect([stageI.view, stageI.signal]).toEqual(['paths', 'route_chosen']);
+  expect(copy.stages.some((s) => s.view === 'roadmap')).toBe(false);
+  // Choosing reaches I, so the current stage moves on to J.
+  expect(at(null, planned, { ...ready('CHOSEN'), possibilities: [path('chosen')] } as unknown as Partial<JourneySignals>).stage.id).toBe('J');
 });
 
-it('stays on G when paths are found and none is explored, even with roadmap cards', () => {
-  const found = { possibilities: [{ id: 'p', title: 'Electronics', why: '', status: 'suggested' }], roadmap: roadmapPage } as unknown as Partial<JourneySignals>;
+it('stays on G when paths are found and none is chosen', () => {
+  const found = { possibilities: [{ id: 'p', title: 'Electronics', why: '', status: 'suggested' }] } as unknown as Partial<JourneySignals>;
   expect(at(null, planned, found).stage.id).toBe('G');
-  const stageH = copy.stages.find((s) => s.id === 'H')!;
-  expect([stageH.title, stageH.view, stageH.signal]).toEqual(['Where to study', 'paths', 'places_searched']);
-});
-
-it('H is reached by a finished places search on any path, with no old roadmap API', () => {
-  const explored = { possibilities: [{ id: 'p', title: 'Electronics', why: '', status: 'exploring' }] } as unknown as Partial<JourneySignals>;
-  const confirmed = ready('PROPOSED');
-  expect(at(null, planned, { ...confirmed, ...explored }).stage.id).toBe('H');
-  expect(at(null, planned, { ...confirmed, ...explored, placesSearched: true }).stage.id).toBe('I');
-  expect(signalMet('places_searched', { picture, possibilities: [], placesSearched: true, roadmap: null })).toBe(true);
 });
 
 vi.mock('@/lib/api', () => ({ workspaceApi: {
-  getCounselorWorkspace: vi.fn(), getPossibilities: vi.fn(), getRoadmapPage: vi.fn(), getPrograms: vi.fn(),
+  getCounselorWorkspace: vi.fn(), getPossibilities: vi.fn(),
 } }));
 
 beforeEach(() => { vi.clearAllMocks(); });
 
-it('reads places search state only for explored paths', async () => {
+it('reads only the workspace and the paths', async () => {
   const { renderHook, waitFor } = await import('@testing-library/react');
   vi.mocked(workspaceApi.getCounselorWorkspace).mockResolvedValue(picture);
   vi.mocked(workspaceApi.getPossibilities).mockResolvedValue([
-    { id: 'seen', title: 'A', why: '', status: 'exploring', evidence: [], unknowns: [] },
-    { id: 'new', title: 'B', why: '', status: 'suggested', evidence: [], unknowns: [] },
+    { id: 'mine', title: 'A', why: '', status: 'chosen', evidence: [], unknowns: [] },
   ]);
-  vi.mocked(workspaceApi.getRoadmapPage).mockResolvedValue(roadmapPage);
-  vi.mocked(workspaceApi.getPrograms).mockResolvedValue({ status: 'completed', programs: [], missing: [] });
   const { result } = renderHook(() => useJourney());
-  await waitFor(() => expect(result.current.data?.placesSearched).toBe(true));
-  expect(workspaceApi.getPrograms).toHaveBeenCalledExactlyOnceWith('seen');
+  await waitFor(() => expect(result.current.data?.possibilities).toHaveLength(1));
+  expect(Object.keys(result.current.data!)).toEqual(['picture', 'possibilities']);
 });

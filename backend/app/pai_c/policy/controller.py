@@ -101,7 +101,7 @@ def next_step(state, chosen):
     reply allowed a question (or one answering a request) ends with the bank
     question (this move's, else the next one), else the next missing education
     basic; otherwise with the phase's line, a concrete action that names a
-    workspace place (in the chosen phase, the route's first open step).
+    workspace place.
     `question` says whether the step is a question; `line` is the phase line,
     the fallback when a question step would repeat one already asked."""
     data = load_data("next_steps.json")
@@ -118,10 +118,7 @@ def next_step(state, chosen):
         if basic:
             topic_text = load_data("areas_policy.json")["topic_text"].get(basic, "")
             return {**step, "key": "basic:" + basic, "text": data["basic_question"].format(topic_text=topic_text)}
-    text = rules["line"]
-    if rules.get("step_line") and state.get("route_step"):
-        text = rules["step_line"].format(step=state["route_step"])
-    return {**step, "question": False, "key": "phase:" + phase, "text": text, "place": rules["place"]}
+    return {**step, "question": False, "key": "phase:" + phase, "text": rules["line"], "place": rules["place"]}
 
 
 def decide(state):

@@ -71,32 +71,6 @@ def next_bank_item(*, vault_types, asked, previous, intent, mentioned, declined_
     return None
 
 
-def route_next_step(db, workspace_id: str) -> str | None:
-    """The active route decision's first step that is not done (its choose-time
-    snapshot and the student's ticks), in its roadmap.json copy; None without one."""
-    from app.pai_c.roadmap.decisions import RouteDecisionService, done_keys
-    row = RouteDecisionService(db).active(workspace_id)
-    if row is None:
-        return None
-    roadmap = load_data("roadmap.json")
-    done, copy = set(done_keys(row)), roadmap["copy"]
-    informational = set(roadmap["steps"].get("informational_kinds", ()))
-    for step in row.steps or []:
-        template = copy.get(step.get("label_key"))
-        kind = step.get("kind") or str(step.get("key") or "").split(":")[0]
-        if kind in informational:  # Strengthen <subject> informs; it never becomes the next step
-            continue
-        if step.get("status") == "done" or step.get("key") in done or not template:
-            continue
-        values = {key: ", ".join(map(str, value)) if isinstance(value, list) else value
-                  for key, value in (step.get("values") or {}).items()}
-        try:
-            return template.format_map(values)
-        except (KeyError, IndexError, ValueError):
-            continue
-    return None
-
-
 def derive_state(signals, *, coverage, mirror_ready, plan, student_count,
                  prior_decisions, replies, student_ordinals, current_event_id,
                  reply_requested_input=None, vault_types=None):
@@ -188,8 +162,6 @@ def build_state(db, turn, signals, history):
         StudentJourney.journey_type == "counselor_decision", StudentJourney.status == "active"))
     draft = (journey.counselor_summary_draft or {}) if journey else {}
     state["journey_stage"] = journey.current_stage if journey else None
-    # The chosen route's first open step names the next step (next_steps.json step_line).
-    state["route_step"] = route_next_step(db, turn.workspace_id) if journey and journey.current_stage == "CHOSEN" else None
     # The card is posted in chat once, the first time it is ready (spec 2.5).
     posted = draft.get("mirror_posted_version") if draft.get("type") == "mirror_state" else None
     state["mirror_due"] = bool(mirror_ready and journey is not None and not posted)

@@ -9,6 +9,10 @@ label, so a step done on a stated fact reads "done · stated". A manual tick
 counts as done, and is offered only where the Vault is silent (`tickable`).
 Labels are copy keys with values (policy/roadmap.json copy); each step carries
 the calendar events it waits for (`timing`) for the time estimate.
+
+Kept for PAI OS reuse (CLAUDE.md): the Counselor's Roadmap page is gone and
+nothing in PAI C calls this; the eligibility it builds on now lives in
+app/pai_c/paths/eligibility.py.
 """
 
 from datetime import date
@@ -16,9 +20,15 @@ from datetime import date
 from app.pai_c.memory import entry_ref, vault_catalog
 from app.pai_c.paths.fields import current_education, group_rules, known_groups, read_education, study_fields
 from app.pai_c.roadmap import calendar as cal
-from app.pai_c.roadmap.engine import Standing, _for_group, _route_group, roadmap_policy
-from app.pai_c.roadmap.rules import Rule, rule_for
+from app.pai_c.paths.admission import Rule, rule_for
+from app.pai_c.paths.eligibility import Standing, _for_group, _route_group
+from app.pai_c.policy.controller import load_data
 from app.pai_c.roadmap.timeline import next_occurrence
+
+
+def roadmap_policy() -> dict:
+    """The step copy and colours (policy/roadmap.json)."""
+    return load_data("roadmap.json")
 
 
 def _policy() -> dict:

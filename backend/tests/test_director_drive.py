@@ -117,7 +117,9 @@ def test_care_never_drives_and_stop_does_not_drive():
 
 def test_next_step_follows_the_journey_phase():
     proposed = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
-    assert proposed.next_step["phase"] == "proposed" and "Roadmap" in proposed.next_step["text"]
+    phase = controller.load_data("next_steps.json")["phases"]["proposed"]
+    assert proposed.next_step["phase"] == "proposed" and proposed.next_step["text"] == phase["line"]
+    assert phase["place"] == "paths" and "Paths page" in phase["line"]
     # A phase that asks: the bank question this reply carries.
     asking = controller.decide(inputs(replies=["Hi?"]))
     assert asking.next_step["key"] == "bank:hobbies"
@@ -149,9 +151,9 @@ async def test_drive_guard_appends_the_phase_line_after_a_failed_rewrite():
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student, "ok"), history=[],
                                          decision=decision, signals=signals())
-    line = controller.load_data("next_steps.json")["phases"]["proposed"]["line"]
-    assert result.reply == "Those are good things to weigh.\n\n" + line
-    assert result.action == {"type": "show_place", "place": "roadmap"}
+    phase = controller.load_data("next_steps.json")["phases"]["proposed"]
+    assert result.reply == "Those are good things to weigh.\n\n" + phase["line"]
+    assert result.action == {"type": "show_place", "place": phase["place"]} == {"type": "show_place", "place": "paths"}
     assert {"drive_retry", "drive_appended"} <= set(result.guard_violations)
 
 
@@ -196,13 +198,13 @@ async def test_a_page_name_mid_reply_is_not_a_next_step():
 @pytest.mark.asyncio
 async def test_the_writers_next_step_field_is_the_last_line():
     decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
-    output = json.dumps({"reply": "Those two fields both use maths.", "next_step": "Open the Roadmap page and pick one.",
+    output = json.dumps({"reply": "Those two fields both use maths.", "next_step": "Open the Paths page and choose one.",
                          "moves": ["give"], "action": {"type": "none"}})
     model = AsyncMock(return_value=output)
     with StudentSession() as student, student.factory() as db:
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
-    assert result.reply == "Those two fields both use maths.\n\nOpen the Roadmap page and pick one."
+    assert result.reply == "Those two fields both use maths.\n\nOpen the Paths page and choose one."
     assert model.await_count == 1 and "drive_retry" not in result.guard_violations
 
 
@@ -223,13 +225,13 @@ async def test_non_english_append_renders_the_step():
     from app.pai_c import language
     decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
     model = AsyncMock(return_value=_reply("Dono fields mein maths hai."))
-    render = AsyncMock(return_value=json.dumps({"text": "Roadmap page kholo aur ek field chuno."}))
+    render = AsyncMock(return_value=json.dumps({"text": "Paths page kholo aur ek path chuno."}))
     with StudentSession() as student, student.factory() as db:
         language.set_chat_language(db, student.workspace_id, {"code": "xx", "script": "latin"})
         db.commit()
         with patch("app.pai_c.deep.turn.chat_completion", model), patch("app.inference.gateway.complete", render):
             result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
-    assert result.reply == "Dono fields mein maths hai.\n\nRoadmap page kholo aur ek field chuno."
+    assert result.reply == "Dono fields mein maths hai.\n\nPaths page kholo aur ek path chuno."
     assert render.await_count == 1
 
 
@@ -256,27 +258,24 @@ def test_answer_move_drives_with_the_next_bank_question_while_getting_to_know():
     assert decision.next_step["key"] == "bank:hobbies" and decision.next_step["question"]
 
 
-def test_chosen_next_step_is_the_routes_first_open_step():
-    from sqlalchemy import select
-    from app.models import RouteDecision
-    from app.pai_c.policy.state import route_next_step
-    steps = [{"key": "group", "label_key": "step_any_group", "values": {}, "status": "done"},
-             {"key": "test:ecat", "label_key": "step_test", "values": {"name": "ECAT"}, "status": "not"},
-             {"key": "apply", "label_key": "step_apply", "values": {"degree": "BS Computer Science"}, "status": "not"}]
-    with StudentSession() as student, student.factory() as db:
-        assert route_next_step(db, student.workspace_id) is None
-        db.add(RouteDecision(workspace_id=student.workspace_id, field_key="computer_science", title="Computer Science",
-                             verdict={}, route={}, steps=steps, steps_done=[]))
-        db.commit()
-        assert route_next_step(db, student.workspace_id) == "Take ECAT"
-        db.scalar(select(RouteDecision)).steps_done = ["test:ecat"]
-        db.commit()
-        assert route_next_step(db, student.workspace_id) == "Apply for BS Computer Science"
-    chosen = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "CHOSEN", "route_step": "Take ECAT"})
-    assert "Take ECAT" in chosen.next_step["text"]
-    generic = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "CHOSEN"})
-    assert generic.next_step["text"] == controller.load_data("next_steps.json")["phases"]["chosen"]["line"]
+def test_chosen_next_step_is_the_chosen_phase_line():
+    """The CHOSEN phase names no route step any more (the plan belongs to PAI
+    OS): it is the phase line, pointing at the Paths page and the chat."""
+    phase = controller.load_data("next_steps.json")["phases"]["chosen"]
+    assert set(phase) == {"ask", "place", "line"} and phase["place"] == "paths" and not phase["ask"]
+    assert "route_step" not in inputs(replies=["Hi?"])
+    chosen = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "CHOSEN"})
+    assert chosen.next_step["phase"] == "chosen" and chosen.next_step["text"] == phase["line"]
+    # A stale route step in the state is ignored: no step line exists to fill.
+    stale = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "CHOSEN", "route_step": "Take ECAT"})
+    assert stale.next_step["text"] == phase["line"] and "ECAT" not in stale.next_step["text"]
 
+
+def test_no_phase_names_a_roadmap_place_or_a_step_line():
+    data = controller.load_data("next_steps.json")
+    for name, phase in data["phases"].items():
+        assert "step_line" not in phase, name
+        assert phase["place"] != "roadmap" and "roadmap" not in phase["line"].lower(), name
 
 
 # ---- fix round 2 ------------------------------------------------------------------
@@ -401,7 +400,7 @@ async def test_a_step_already_closing_the_reply_is_posted_once():
     """Smoke run 5: the Writer put its step inside `reply` and in `next_step`; the
     student saw the line twice."""
     decision = controller.decide({**inputs(replies=["Hi?"]), "journey_stage": "PROPOSED"})
-    step = "Open the Roadmap page and pick one."
+    step = "Open the Paths page and choose one."
     output = json.dumps({"reply": "Those two fields both use maths.\n\n" + step, "next_step": step,
                          "moves": ["give"], "action": {"type": "none"}})
     model = AsyncMock(return_value=output)
@@ -409,17 +408,4 @@ async def test_a_step_already_closing_the_reply_is_posted_once():
         with patch("app.pai_c.deep.turn.chat_completion", model):
             result = await run_deep_turn(db, _turn(student, "ok"), history=[], decision=decision, signals=signals())
     assert result.reply == "Those two fields both use maths.\n\n" + step
-    assert result.reply.count("Open the Roadmap page") == 1 and result.next_step == step
-
-
-def test_next_step_skips_the_informational_strengthen_step():
-    from app.models import RouteDecision
-    from app.pai_c.policy.state import route_next_step
-    steps = [{"key": "strengthen:mathematics", "kind": "strengthen", "label_key": "step_strengthen",
-              "values": {"subject": "Mathematics"}, "status": "not"},
-             {"key": "test:ecat", "label_key": "step_test", "values": {"name": "ECAT"}, "status": "not"}]
-    with StudentSession() as student, student.factory() as db:
-        db.add(RouteDecision(workspace_id=student.workspace_id, field_key="computer_science", title="Computer Science",
-                             verdict={}, route={}, steps=steps, steps_done=[]))
-        db.commit()
-        assert route_next_step(db, student.workspace_id) == "Take ECAT"
+    assert result.reply.count("Open the Paths page") == 1 and result.next_step == step

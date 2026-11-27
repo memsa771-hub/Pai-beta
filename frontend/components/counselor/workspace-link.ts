@@ -1,8 +1,9 @@
-/** Section names land on the section's first view; old view names (roadmaps,
- * and the Compare and Plan tabs) land on the one Roadmap page. Shared by the
- * shell's URL reader and chat place links. */
+/** Section names land on the section's first view; the removed Roadmap page
+ * (roadmap, roadmaps, and its old Compare and Plan tabs) lands on Paths, where
+ * paths are compared and chosen. Shared by the shell's URL reader and chat
+ * place links. */
 export const VIEW_ALIASES: Record<string, string> = {
-  roadmaps: "roadmap", compare: "roadmap", plan: "roadmap", vault: "files", pai: "threads", home: "overview",
+  roadmap: "paths", roadmaps: "paths", compare: "paths", plan: "paths", vault: "files", pai: "threads", home: "overview",
 };
 
 /** Opens a workspace view from anywhere, chat included. The shell reads the

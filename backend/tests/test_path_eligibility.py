@@ -1,18 +1,27 @@
-"""The roadmap engine: from the student's education and live paths, which
-fields are open, need a step, are not open, or cannot be checked yet. Pure and
-deterministic (spec docs/counselor/ROADMAP_ENGINE_SPEC.md §2 and §5)."""
+"""Paths eligibility: from the student's education, whether each path's study
+field is open, needs a step, is not open, or cannot be checked yet, and the
+Compare table built from it (app/pai_c/paths/eligibility.py, rules from
+app/pai_c/paths/admission.py). Pure and deterministic: no model call.
 
+The helpers here (fsc, standing_of, status, add_education, add_path,
+field_title) are shared by other test files."""
+
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 from app.journey import JourneyService
 from app.memory.student_records import StudentRecordService
-from app.pai_c.paths.fields import study_fields
+from app.models import User, Workspace
+from app.pai_c.paths.admission import grade_list, ibcc_percent, rule_for, rules_as_of
+from app.pai_c.paths.eligibility import (compare, education_line, eligibility_policy, student_standing,
+                                         verdict)
+from app.pai_c.paths.fields import read_education, study_fields
 from app.pai_c.possibilities import PossibilityService
-from app.pai_c.paths.fields import read_education
-from app.pai_c.roadmap.engine import RoadmapEngine, education_line, roadmap_policy, student_standing, verdict
-from app.pai_c.roadmap.rules import grade_list, ibcc_percent, rule_for
 from scripts.counselor_eval_support import StudentSession
+
+FRONTEND_COPY = (Path(__file__).resolve().parents[2] / "frontend" / "components" / "counselor"
+                 / "workspace" / "copy.json")
 
 
 def fsc(group, percent=None, **extra):
@@ -51,36 +60,33 @@ def field_title(key):
     return study_fields()[key].title
 
 
-def build_for(education, paths):
+def compare_for(education, paths):
+    """compare() over fresh paths (field keys), asked in the given order."""
     with StudentSession() as student, student.factory() as db:
         for record in education:
             add_education(student, db, record)
-        for key in paths:
-            add_path(student, db, field_title(key), key)
-        return RoadmapEngine(db).build(student.workspace_id)
+        ids = [add_path(student, db, field_title(key), key).id for key in paths]
+        return compare(db, student.workspace_id, ids)
 
 
 def by_key(result):
-    return {card["field_key"]: card for card in result["fields"]}
+    return {row["field_key"]: row["verdict"] for row in result["paths"]}
 
 
-# ---- spec §5 scenarios --------------------------------------------------------
+# ---- spec scenarios -----------------------------------------------------------
 
 def test_pre_eng_78_open():
-    result = build_for([fsc("pre_engineering", 78)],
-                       ["electrical_engineering", "computer_engineering", "mbbs"])
-    cards = by_key(result)
-    assert cards["electrical_engineering"]["status"] == "open"
-    assert cards["computer_engineering"]["status"] == "open"
-    assert cards["mbbs"]["status"] == "not_open"
-    electrical = cards["electrical_engineering"]["verdict"]
+    result = compare_for([fsc("pre_engineering", 78)],
+                         ["electrical_engineering", "computer_engineering", "mbbs"])
+    verdicts = by_key(result)
+    assert verdicts["electrical_engineering"]["status"] == "open"
+    assert verdicts["computer_engineering"]["status"] == "open"
+    assert verdicts["mbbs"]["status"] == "not_open"
+    electrical = verdicts["electrical_engineering"]
     rule = rule_for("electrical_engineering")
     assert electrical["years"] == 4 and electrical["min_percent"] == rule.min_percent
     assert [t["name"] for t in electrical["tests"]] == [t.name for t in rule.entry_tests]
     assert electrical["student_percent"] == 78
-    assert result["counts"] == {"open": 2, "step": 0, "not_open": 1, "unknown": 0}
-    assert [c["status"] for c in result["fields"]] == ["open", "open", "not_open"]
-    assert result["chosen"] is None
     line = result["education_line"]
     assert (line["level_label"], [g["label"] for g in line["groups"]], line["percent"]) == \
         ("FSc", ["Pre-Engineering"], 78)
@@ -131,34 +137,31 @@ def test_no_marks_open_with_note():
 
 
 def test_no_education_not_readable():
-    result = build_for([], ["electrical_engineering"])
-    assert result["standing"]["readable"] is False
+    assert standing_of().readable is False
+    result = compare_for([], ["electrical_engineering"])
     assert result["education_line"] is None
-    [card] = result["fields"]
-    assert card["status"] == "unknown" and card["verdict"]["reasons"][0]["key"] == "needs_education"
+    [row] = result["paths"]
+    assert row["verdict"]["status"] == "unknown" and row["verdict"]["reasons"][0]["key"] == "needs_education"
 
 
 def test_bachelor_undergrad_only_note():
-    result = build_for([{"qualification_name": "bachelor", "field_of_study": "computer_science",
-                         "academic_status": "current"}], ["software_engineering", "mbbs"])
-    assert {c["status"] for c in result["fields"]} == {"unknown"}
-    assert all(c["verdict"]["reasons"][0]["key"] == "undergrad_only" for c in result["fields"])
+    result = compare_for([{"qualification_name": "bachelor", "field_of_study": "computer_science",
+                           "academic_status": "current"}], ["software_engineering", "mbbs"])
+    assert {row["verdict"]["status"] for row in result["paths"]} == {"unknown"}
+    assert all(row["verdict"]["reasons"][0]["key"] == "undergrad_only" for row in result["paths"])
 
 
-# ---- review focus ---------------------------------------------------------------
+# ---- standing and verdict details ------------------------------------------------
 
 def test_own_path_without_field_is_unknown():
     with StudentSession() as student, student.factory() as db:
         add_education(student, db, fsc("pre_engineering", 78))
-        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        add_path(student, db, "Become a pilot", None, why="You said you love flying.", source="student")
-        add_path(student, db, field_title("mbbs"), "mbbs", status="dismissed")
-        result = RoadmapEngine(db).build(student.workspace_id)
-    assert [(c["title"], c["status"]) for c in result["fields"]] == [
-        (field_title("electrical_engineering"), "open"), ("Become a pilot", "unknown")]
-    own = result["fields"][1]
-    assert own["field_key"] is None and own["why"] == "You said you love flying."
-    assert own["verdict"]["reasons"] == [{"key": "cannot_check"}]
+        electrical = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        pilot = add_path(student, db, "Become a pilot", None, why="You said you love flying.", source="student")
+        result = compare(db, student.workspace_id, [electrical.id, pilot.id])
+    assert [(row["field_key"], row["verdict"]["status"]) for row in result["paths"]] == [
+        ("electrical_engineering", "open"), (None, "unknown")]
+    assert result["paths"][1]["verdict"]["reasons"] == [{"key": "cannot_check"}]
     assert verdict("not_a_field", standing_of(fsc("pre_engineering"))).status == "unknown"
 
 
@@ -182,16 +185,14 @@ def test_a_level_grades_equivalence():
     assert verdict("electrical_engineering", standing).status == "open"
 
 
-def test_engine_makes_no_model_call():
-    import app.pai_c.roadmap.engine as engine
-    source = open(engine.__file__, encoding="utf-8").read()
+def test_eligibility_makes_no_model_call():
+    import app.pai_c.paths.eligibility as eligibility
+    source = open(eligibility.__file__, encoding="utf-8").read()
     assert "inference" not in source and "chat_completion" not in source
     with patch("app.inference.gateway.complete", side_effect=AssertionError("model called")):
-        result = build_for([fsc("pre_medical", 70)], ["mbbs", "electrical_engineering"])
+        result = compare_for([fsc("pre_medical", 70)], ["mbbs", "electrical_engineering"])
     assert by_key(result)["mbbs"]["status"] == "open"
 
-
-# ---- fix round 1 -----------------------------------------------------------------
 
 def a_level(grade=None, grades=None):
     details = {"subjects": ["physics", "chemistry", "mathematics"]}
@@ -207,14 +208,14 @@ def test_a_grade_whose_mark_is_text_takes_its_floor_from_the_data():
     """IBCC lists A* as "above 90": the number used comes from the rules file,
     so no grade token lives in code."""
     import copy
-    from app.pai_c.roadmap import rules
-    data = copy.deepcopy(rules._data())
+    from app.pai_c.paths import admission
+    data = copy.deepcopy(admission._data())
     table = data["equivalence"]["o_level_a_level"]
     table["grade_floor_percent"] = {**table["grade_floor_percent"], "A*": 95}
-    with patch.object(rules, "_data", return_value=data):
+    with patch.object(admission, "_data", return_value=data):
         assert ibcc_percent(["A*", "A"]) == 90
     assert ibcc_percent(["A*", "A"]) == 87.5
-    assert '"A*"' not in Path(rules.__file__).read_text(encoding="utf-8")
+    assert '"A*"' not in Path(admission.__file__).read_text(encoding="utf-8")
 
 
 def test_grades_only_from_structured_data():
@@ -256,22 +257,22 @@ def test_completed_records_read_the_highest_level():
     with StudentSession() as student, student.factory() as db:
         add_education(student, db, fsc("pre_engineering", 72))
         add_education(student, db, matric)
-        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        result = RoadmapEngine(db).build(student.workspace_id)
-    assert result["standing"]["level"] == "fsc" and result["fields"][0]["status"] == "open"
+        row = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        result = compare(db, student.workspace_id, [row.id])
+    assert result["education_line"]["level"] == "fsc" and result["paths"][0]["verdict"]["status"] == "open"
 
 
 def test_matric_step_names_the_full_group():
     result = verdict("electrical_engineering", standing_of({"qualification_name": "matric",
                                                             "academic_status": "completed"}))
     [group] = result.reasons[0]["groups"]
-    copy = roadmap_policy()["copy"]["choose_group"]
+    copy = eligibility_policy()["copy"]["choose_group"]
     assert copy.format(groups=group["route_label"]) == "Choose FSc Pre-Engineering in intermediate"
 
 
 def test_reason_values_render_whole_numbers():
     [reason] = verdict("electrical_engineering", standing_of(fsc("pre_engineering", 55))).reasons
-    assert roadmap_policy()["copy"][reason["key"]].format(**reason) == "Needs 60%; you have 55%"
+    assert eligibility_policy()["copy"][reason["key"]].format(**reason) == "Needs 60%; you have 55%"
 
 
 def test_o_level_line_names_no_group():
@@ -280,25 +281,74 @@ def test_o_level_line_names_no_group():
     assert education_line(standing_of(record))["groups"] == []
 
 
-def region_of(education, city=None, **record_extra):
-    from datetime import date
-    from app.memory.vault import VaultService
+# ---- the Compare table -------------------------------------------------------------
+
+def test_compare_keeps_order_drops_dismissed_foreign_and_duplicates():
     with StudentSession() as student, student.factory() as db:
-        add_education(student, db, {**education, **record_extra})
-        if city:
-            VaultService(db).apply_fact(student.workspace_id, "location.current_city", city, "user_explicit")
-            db.commit()
-        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        card = by_key(RoadmapEngine(db).build(student.workspace_id, date(2026, 10, 29)))["electrical_engineering"]
-        return {row["region"] for row in card["time"]["basis"] if row["step"]}
+        add_education(student, db, fsc("pre_engineering", 78))
+        electrical = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        mbbs = add_path(student, db, field_title("mbbs"), "mbbs")
+        dismissed = add_path(student, db, field_title("civil_engineering"), "civil_engineering",
+                             status="dismissed")
+        someone = User(email="another-student@example.test", username="another_student")
+        db.add(someone)
+        db.flush()
+        other = Workspace(name="Another student", owner_user_id=someone.id, password_hash="synthetic-test-only")
+        db.add(other)
+        db.flush()
+        journey = JourneyService(db).ensure_counselor(str(other.id))
+        foreign = PossibilityService(db).add(str(other.id), journey.id, title=field_title("computer_science"),
+                                             why="Someone else's path.", kind="discovered", source="analyzer",
+                                             status="suggested")
+        foreign.study_field = {"key": "computer_science"}
+        db.commit()
+        result = compare(db, student.workspace_id,
+                         [mbbs.id, foreign.id, electrical.id, dismissed.id, mbbs.id, "no-such-id"])
+        mbbs_id, electrical_id = mbbs.id, electrical.id
+        # The other student's own compare sees their path.
+        assert [row["field_key"] for row in compare(db, str(other.id), [foreign.id])["paths"]] == \
+            ["computer_science"]
+    assert [row["id"] for row in result["paths"]] == [mbbs_id, electrical_id]
+    assert [row["field_key"] for row in result["paths"]] == ["mbbs", "electrical_engineering"]
+    assert [row["verdict"]["status"] for row in result["paths"]] == ["not_open", "open"]
+    assert result["education_line"]["level"] == "fsc" and result["education_line"]["percent"] == 78
 
 
-def test_karachi_board_student_card_names_sindh():
-    regions = region_of(fsc("pre_engineering", 78, academic_status="current"),
-                        details={"awarding_body": "bise_karachi"})
-    assert "sindh" in regions
+def test_compare_verdict_shape():
+    result = compare_for([fsc("pre_engineering", 55)], ["electrical_engineering"])
+    assert set(result) == {"education_line", "rules_as_of", "paths"}
+    assert result["rules_as_of"] == rules_as_of()  # every rule fact shows when the rules were checked
+    [row] = result["paths"]
+    assert set(row) == {"id", "field_key", "verdict"}
+    assert set(row["verdict"]) == {"status", "reasons", "needs", "tests", "years", "min_percent",
+                                   "student_percent", "confidence", "sources", "subjects"}
+    assert row["verdict"]["status"] == "step"
+    assert {"kind": "marks", "detail": {"min": 60, "have": 55}} in row["verdict"]["needs"]
+    assert row["verdict"]["sources"] and all(s.startswith("http") for s in row["verdict"]["sources"])
+    json.dumps(result)  # the API returns it as is
 
 
-def test_city_decides_the_region_without_a_board():
-    regions = region_of(fsc("pre_engineering", 78, academic_status="current"), city="Peshawar")
-    assert "kp" in regions
+def test_compare_with_no_ids_is_empty():
+    result = compare_for([fsc("pre_engineering", 78)], [])
+    assert result["paths"] == [] and result["education_line"]["level"] == "fsc"
+
+
+def test_verdict_statuses_and_reason_keys_have_copy():
+    policy = eligibility_policy()
+    assert set(policy["status_order"]) == {"open", "step", "not_open", "unknown"}
+    for records, key in [((fsc("pre_engineering", 55),), "electrical_engineering"),
+                         ((fsc("pre_engineering"),), "electrical_engineering"),
+                         ((fsc("pre_medical", 80),), "civil_engineering"),
+                         ((fsc("pre_engineering", 78),), "mbbs"),
+                         ((), "electrical_engineering")]:
+        for reason in verdict(key, standing_of(*records)).reasons:
+            assert reason["key"] in policy["copy"], reason
+
+
+def test_frontend_compare_copy_mirrors_the_policy():
+    frontend = json.loads(FRONTEND_COPY.read_text(encoding="utf-8"))["compare"]
+    policy = eligibility_policy()
+    assert frontend["templates"] == policy["copy"]
+    assert frontend["limits"] == policy["compare"] == {"min": 2, "max": 3}
+    assert frontend["groupJoiner"] == policy["group_joiner"]
+    assert set(frontend["status"]) == set(policy["status_order"])

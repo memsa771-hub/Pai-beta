@@ -1,4 +1,3 @@
-import type { Possibility } from "./possibilities";
 import type { MirrorPicture, MirrorUnknown } from "./mirror";
 export type EvidenceItem = {
   id?: string;
@@ -61,34 +60,6 @@ export type FactCard = {
   quote?: string;
   record_id?: string;
   education_id?: string;
-};
-export type PathResult = {
-  possibility: Possibility;
-  status: string;
-  /** The Vault changed since this explanation was written. */
-  stale?: boolean;
-  path: Record<string, unknown> | null;
-  facts: Record<string, unknown>[];
-  missing: unknown[];
-};
-export type Program = {
-  opportunity_id: string;
-  title: string;
-  status: string;
-  source_url: string;
-  checked_at: string;
-  rules: Record<string, unknown>[];
-  fees: Record<string, unknown>;
-  eligibility: {
-    label: string;
-    gaps: unknown[];
-    route: Record<string, unknown>[];
-  };
-};
-export type Programs = {
-  status: string;
-  programs: Program[];
-  missing: string[];
 };
 export type CounselorHealth = {
   planner_lag_alert: boolean;

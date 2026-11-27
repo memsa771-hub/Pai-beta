@@ -7,10 +7,9 @@ from datetime import date
 from types import SimpleNamespace
 
 from app.pai_c.paths.fields import study_fields
-from app.pai_c.roadmap.decisions import done_keys
-from app.pai_c.roadmap.engine import roadmap_policy, student_standing, verdict
-from app.pai_c.roadmap.rules import rule_for
-from app.pai_c.roadmap.steps import route_steps
+from app.pai_c.paths.admission import rule_for
+from app.pai_c.paths.eligibility import student_standing, verdict
+from app.pai_c.roadmap.steps import roadmap_policy, route_steps
 
 TODAY = date(2026, 10, 29)
 
@@ -141,15 +140,6 @@ def test_bridge_done_with_course_record():
     assert step(route("computer_science", fsc("pre_medical", 70), biology), "bridge")["status"] == "not"
 
 
-def test_legacy_ticks_map_by_position_once():
-    old = SimpleNamespace(steps=[{"key": "step_marks", "min": 60, "have": 55},
-                                 {"key": "step_test", "name": "MDCAT (MBBS)"},
-                                 {"key": "step_apply", "degree": "MBBS"}],
-                          steps_done=[True, False, True])
-    assert done_keys(old) == ["marks", "apply"]
-    assert done_keys(SimpleNamespace(steps=[], steps_done=["apply"])) == ["apply"]
-
-
 def test_degree_student_has_no_undergraduate_route():
     bachelor = {"qualification_name": "bachelor", "field_of_study": "computer_science",
                 "academic_status": "current"}
@@ -195,19 +185,25 @@ def test_steps_follow_the_standings_record():
     """Two education records: an older current FSc and a completed Matric edited
     later. The standing reads the current FSc; the steps cite that same record."""
     from app.pai_c.memory import MemoryService
-    from app.pai_c.roadmap.engine import RoadmapEngine
+    from app.pai_c.paths.fields import current_education
     from scripts.counselor_eval_support import StudentSession
-    from tests.test_roadmap_engine import add_education, add_path, field_title
+    from tests.test_path_eligibility import add_education
     with StudentSession() as student, student.factory() as db:
         add_education(student, db, fsc("pre_engineering", 72, status="current"))
         add_education(student, db, {"qualification_name": "matric", "academic_status": "completed",
                                     "result": {"percentage": 90}})
-        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
-        page = RoadmapEngine(db).build(student.workspace_id, today=TODAY)
-        cards = [c for c in MemoryService(db).profile_cards(student.workspace_id) if c["kind"] == "education"]
+        memory = MemoryService(db)
+        cards = [c for c in memory.profile_cards(student.workspace_id) if c["kind"] == "education"]
+        rows = memory.vault_rows(student.workspace_id)
+    records = [c["value"] for c in cards]
+    standing = student_standing(records)
+    current = current_education(records)
+    current_id = next(c["id"] for c in cards if c["value"] is current)
     fsc_id = next(c["id"] for c in cards if c["value"]["qualification_name"] == "fsc")
-    assert page["standing"]["level"] == "fsc"
-    steps = page["fields"][0]["steps"]
+    assert standing.level == "fsc" and current_id == fsc_id
+    card = {"field_key": "electrical_engineering", "title": study_fields()["electrical_engineering"].title,
+            "verdict": asdict(verdict("electrical_engineering", standing))}
+    steps = route_steps(card, standing, rows, today=TODAY, record=current, record_id=current_id)
     for key in ("group", "complete_intermediate", "marks"):
         assert step(steps, key)["evidence"]["id"] == f"education:{fsc_id}", key
     assert step(steps, "complete_intermediate")["status"] == "half"

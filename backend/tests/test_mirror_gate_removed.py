@@ -26,7 +26,7 @@ from app.research.gateway import request_research
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import client_for, fake_post, prepare
 from tests.test_mirror_engine import QUOTE, _education, _record
-from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
+from tests.test_path_eligibility import add_education, add_path, field_title, fsc
 
 BACKEND = Path(__file__).resolve().parents[1]
 HEADERS = {"X-Workspace-Token": "synthetic-test-only"}
@@ -192,15 +192,16 @@ def test_escalation_still_works_after_choose():
         _, journey, _ = prepare(student, db)
         JourneyService(db).mark_mirror_ready(ws)
         add_education(student, db, fsc("pre_engineering", 78))
-        add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+        path_id = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering").id
         sync_counselor_stage(db, ws, reason="student")
         db.commit()
         assert stage(db, journey.id) == "PROPOSED"
         client = client_for(student)
         try:
-            response = client.post("/v1/roadmap/choose", params={"network": ws}, headers=HEADERS,
-                                   json={"field_key": "electrical_engineering"})
+            response = client.post(f"/v1/counselor/possibilities/{path_id}/choose", params={"network": ws},
+                                   headers=HEADERS)
             assert response.status_code == 200, response.text
+            assert response.json()["data"]["status"] == "chosen"
             assert stage(db, journey.id) == "CHOSEN"
             body = {"workspace_id": ws, "journey_id": journey.id, "reason_type": "blocking_gap",
                     "details": "Intake has closed"}

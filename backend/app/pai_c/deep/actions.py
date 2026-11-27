@@ -106,7 +106,7 @@ async def dispatch_action(db, turn: CounselorTurnInput, action: dict,
         _record(db, turn, kind, "recorded")
         return kind, "recorded"
     # "rethink" moves only the journey stage back to direction; it never
-    # touches the student's chosen route (that changes only on the Roadmap page).
+    # touches the student's chosen path (that changes only on the Paths page).
     from app.journey import JourneyService
 
     stage = context.journey.current_stage if context.journey else None

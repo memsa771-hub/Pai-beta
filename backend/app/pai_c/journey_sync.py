@@ -50,11 +50,11 @@ def _live_paths(db, workspace_id: str) -> bool:
 
 
 def _propose(db, journey: StudentJourney, actor: str) -> None:
-    """MIRROR -> PROPOSED, then an active route decision takes it to CHOSEN."""
-    from app.pai_c.roadmap.decisions import RouteDecisionService
+    """MIRROR -> PROPOSED, then an active path choice takes it to CHOSEN."""
+    from app.pai_c.paths.choice import PathChoiceService
     if journey.current_stage != PROPOSED:
         JourneyService(db).set_counselor_stage(journey.workspace_id, journey.id, PROPOSED, actor=actor)
-    RouteDecisionService(db).follow_active(journey.workspace_id, actor=actor)
+    PathChoiceService(db).follow_active(journey.workspace_id, actor=actor)
 
 
 def sync_counselor_stage(db, workspace_id: str, *, reason: str, actor: str | None = None) -> str | None:

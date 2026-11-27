@@ -17,7 +17,7 @@ export function PossibilityCard({ value, onChange, tone }: { value: Possibility;
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const action = async (kind: 'explore' | 'save' | 'dismiss') => {
+  const action = async (kind: 'save' | 'dismiss') => {
     if (busy) return;
     setBusy(true); setError('');
     try { onChange(await workspaceApi.changePossibility(value.id, kind)); }
@@ -27,7 +27,8 @@ export function PossibilityCard({ value, onChange, tone }: { value: Possibility;
   return <PathCardView compact headingLevel={3} id={value.id} tone={tone} title={value.title} whyLabel={copy.why} why={value.why} evidence={value.evidence}
     quote={value.evidence[0]?.text} fit={value.fit} studyField={value.study_field} status={t(`possibilities.${value.status}`)} statusTone={statusTone[value.status]} error={error}
     actions={<>
-      {(['suggested', 'saved', 'dismissed'].includes(value.status)) && <Button size="tap" disabled={busy} onClick={() => void action('explore')}><Compass aria-hidden />{t('possibilities.explore')}</Button>}
+      {/* Paths are compared and chosen on the Paths page. */}
+      {(['suggested', 'saved', 'exploring'].includes(value.status)) && <Button size="tap" disabled={busy} onClick={() => openWorkspaceView('paths')}><Compass aria-hidden />{t('possibilities.choose')}</Button>}
       {(['suggested', 'dismissed'].includes(value.status)) && <Button size="tap" variant="soft" disabled={busy} onClick={() => void action('save')}><Bookmark aria-hidden />{t('possibilities.save')}</Button>}
       {(['suggested', 'saved', 'exploring'].includes(value.status)) && <Button size="tap" variant="ghost" disabled={busy} onClick={() => void action('dismiss')}><X aria-hidden />{t('possibilities.dismiss')}</Button>}
     </>} />;

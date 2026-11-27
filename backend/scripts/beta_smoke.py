@@ -1,8 +1,8 @@
 """Beta smoke: one fresh student through the running local stack, real models.
 
 Drives the HTTP API the frontend uses (BETA_CONVERSATION_SPEC 6): sign-up,
-onboarding, the opening, six chat turns, Vault, Mirror, paths, roadmap
-(choose and tick), "how does PAI work?", and the month's spend after every
+onboarding, the opening, six chat turns, Vault, Mirror, paths (compare two,
+choose one, read the decision record), "how does PAI work?", and the month's spend after every
 model-bound step. Each step is a named check with pass/fail and timing; the
 run stops at the first hard failure (or when the spend this run caused goes
 over --cap-usd) and always writes the report.
@@ -37,7 +37,7 @@ also creates the Firebase account and workspace and stops before onboarding
 service account and web key are present.
 
 Background settle: with a docker or db spend source the run also reads the
-workspace's background_jobs. Before the Vault, Mirror and choose checks it waits
+workspace's background_jobs. Before the Vault, Mirror and compare checks it waits
 (up to --settle-timeout s) until no memory.extract, memory.reconcile,
 counselor.analyze, counselor.mirror_text or counselor.paths job is pending or
 running, and the report lists the extractor and planner job durations
@@ -255,21 +255,28 @@ def check_paths(possibilities: list[dict]) -> tuple[bool, str]:
     return not problems, "; ".join(problems + [tail])
 
 
-def check_roadmap(page: dict, region: str = "punjab") -> tuple[bool, str]:
-    cards = page.get("fields") or []
+def eligibility_statuses() -> list[str]:
+    """The verdict statuses a Paths badge can show (policy/eligibility.json)."""
+    return json.loads((POLICY / "eligibility.json").read_text(encoding="utf-8"))["status_order"]
+
+
+def check_compare(table: dict, ids: list[str], statuses: list[str]) -> tuple[bool, str]:
+    """The Compare table answers every asked path, in the order asked, each
+    with a verdict status the policy knows, under the student's education line."""
+    rows = table.get("paths") or []
     problems = []
-    if not cards:
-        return False, "no fields"
-    uncoloured = [c.get("title") for c in cards for s in c.get("steps") or [] if not s.get("colour")]
-    if uncoloured:
-        problems.append(f"steps without colour on {sorted(set(uncoloured))}")
-    if not page.get("rules_as_of"):
-        problems.append("no rules_as_of")
-    timed = [c for c in cards if c.get("time")]
-    regions = {b.get("region") for c in timed for b in c["time"].get("basis") or []}
-    if region not in regions:
-        problems.append(f"time.basis regions {sorted(r for r in regions if r)} lack {region}")
-    note = f"{len(cards)} fields, {len(timed)} timed, statuses {[c.get('status') for c in cards]}"
+    if len(ids) < 2:
+        problems.append(f"{len(ids)} live paths (< 2 to compare)")
+    got = [r.get("id") for r in rows]
+    if got != list(ids):
+        problems.append(f"rows {got} != asked {list(ids)}")
+    found = [(r.get("verdict") or {}).get("status") for r in rows]
+    unknown = [s for s in found if s not in statuses]
+    if unknown:
+        problems.append(f"statuses {unknown} not in {statuses}")
+    if not (table.get("education_line") or "").strip():
+        problems.append("no education_line")
+    note = f"{len(rows)} paths, statuses {found}"
     return not problems, "; ".join(problems + [note]) if problems else note
 
 
@@ -480,7 +487,7 @@ class Api:
             headers["Authorization"] = f"Bearer {bearer or self.bearer}"
         if self.token:
             headers["X-Workspace-Token"] = self.token
-        if self.workspace_id and path.startswith(("/v1/vault", "/v1/counselor", "/v1/roadmap")):
+        if self.workspace_id and path.startswith(("/v1/vault", "/v1/counselor", "/v1/decision-records")):
             params = {"network": self.workspace_id, **(params or {})}
         response = self.http.request(method, path, params=params, json=body, headers=headers)
         try:
@@ -698,38 +705,35 @@ class Smoke:
         if self.run.checks[-1].note.startswith("no paths"):
             raise HardFailure("7 paths: no paths, nothing to choose")
 
-    def roadmap(self) -> None:
-        page = {}
+    def choose_path(self) -> None:
+        live: list[dict] = []
 
-        def view():
-            page.update(self.api.call("GET", "/v1/roadmap"))
-            return check_roadmap(page)
-        self.step("8a roadmap steps coloured, region dates", view)
-        card = next((c for c in page.get("fields") or [] if c.get("status") in ("open", "step")), None)
+        def compare():
+            settle = self.settle()  # the paths job may still be redrawing the list
+            live.extend(p for p in self.api.call("GET", "/v1/counselor/possibilities")["possibilities"]
+                        if p.get("status") != "dismissed")
+            ids = [p["id"] for p in live[:2]]
+            table = self.api.call("GET", "/v1/counselor/possibilities/compare", params={"ids": ids})
+            ok, note = check_compare(table, ids, eligibility_statuses())
+            return ok, f"{note}; {settle}"
+        self.step("8a compare two paths, eligibility statuses", compare)
+        path = live[0] if live else None
 
         def choose():
-            if card is None:
-                return False, "no open/step field to choose"
-            settle = self.settle()
-            # Choosing needs a ready Mirror; without one the choose is skipped (a defect).
-            if not self.api.call("GET", "/v1/counselor/summary")["card"].get("ready"):
-                return False, f"skipped: Mirror not ready; {settle}"
-            self.api.call("POST", "/v1/roadmap/choose", body={"field_key": card["field_key"]})
+            if path is None:
+                return False, "no live path to choose"
+            chosen = self.api.call("POST", f"/v1/counselor/possibilities/{path['id']}/choose")
             stage = self.api.call("GET", "/v1/counselor/workspace").get("stage")
-            return stage == "CHOSEN", f"chose {card['field_key']}; stage {stage}; {settle}"
+            ok = stage == "CHOSEN" and chosen.get("id") == path["id"]
+            return ok, f"chose {path.get('title')}; stage {stage}"
         if not self.step("8b choose -> CHOSEN", choose):
             return
 
-        def tick():
-            chosen = self.api.call("GET", "/v1/roadmap").get("chosen") or {}
-            step = next((s for s in chosen.get("steps") or [] if s.get("kind") == "apply"), None)
-            if step is None:
-                return False, "no apply step on the chosen route"
-            if not step.get("tickable"):
-                return False, f"apply step not tickable (status {step.get('status')})"
-            result = self.api.call("POST", "/v1/roadmap/steps", body={"key": step["key"], "done": True})
-            return step["key"] in (result.get("steps_done") or []), f"steps_done {result.get('steps_done')}"
-        self.step("8c tick apply step", tick)
+        def record():
+            current = self.api.call("GET", "/v1/decision-records/current") or {}
+            ok = current.get("possibility_id") == path["id"] and not current.get("withdrawn_at")
+            return ok, f"decision record {current.get('field_key')} ({current.get('title')}), "                        f"live_status {current.get('live_status')}"
+        self.step("8c decision record shows the choice", record)
 
     def about_pai(self) -> None:
         def go():
@@ -747,7 +751,7 @@ class Smoke:
         self.vault()
         self.mirror()
         self.paths()
-        self.roadmap()
+        self.choose_path()
         self.about_pai()
 
     def dry(self, args) -> None:
@@ -839,7 +843,7 @@ def main(argv=None) -> int:
     source.add_argument("--spend-from-db", action="store_true")
     parser.add_argument("--reply-timeout", type=float, default=120.0, help="seconds to wait for each reply")
     parser.add_argument("--settle-timeout", type=float, default=120.0,
-                        help="seconds to wait for background extraction/analysis before Vault, Mirror, choose")
+                        help="seconds to wait for background extraction/analysis before Vault, Mirror, compare")
     parser.add_argument("--dry-run", action="store_true", help="no model calls: check stack, auth, spend, models")
     args = parser.parse_args(argv)
     if not args.dry_run:

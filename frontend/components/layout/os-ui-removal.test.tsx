@@ -35,10 +35,10 @@ it.each(['applications', 'deadlines', 'tasks', 'workflows'])('ignores an old sav
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor', { skipFocus: true });
 });
 
-it.each(['roadmaps', 'roadmap', 'compare', 'plan'])('restores a saved %s view on the one Roadmap page', (view) => {
+it.each(['roadmaps', 'roadmap', 'compare', 'plan'])('restores a saved %s view of the removed Roadmap page on Paths', (view) => {
   localStorage.setItem(preferenceKey, JSON.stringify({ view }));
   renderHook(useDesktopWorkspaceState);
-  expect(state.openView).toHaveBeenCalledWith('roadmap');
+  expect(state.openView).toHaveBeenCalledWith('paths');
 });
 
 it.each([
@@ -50,10 +50,10 @@ it.each([
   expect(state.openView).not.toHaveBeenCalled();
 });
 
-it('keeps roadmap notifications and Counselor conversation navigation', async () => {
+it('opens old roadmap notifications on Paths and keeps Counselor conversation navigation', async () => {
   const { result } = renderHook(useNotificationNavigation);
   await result.current(notification({ createdBy: 'system:roadmaps' }));
-  expect(state.openView).toHaveBeenLastCalledWith('roadmap');
+  expect(state.openView).toHaveBeenLastCalledWith('paths');
   await result.current(notification({ channelName: 'pai-counselor', isRead: true }));
   expect(state.setCurrentSessionId).toHaveBeenCalledWith('pai-counselor');
   expect(state.openView).toHaveBeenLastCalledWith('threads');

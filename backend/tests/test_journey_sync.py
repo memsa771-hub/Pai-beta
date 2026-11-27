@@ -3,7 +3,7 @@
 Every journey here reaches its stage through real writes: Vault rows through
 the reconciler (whose Mirror hook syncs the stage), notebook rows through the
 analyst's stage step, paths through the Path engine job, a choice through the
-roadmap API. A rethink or a PAI OS escalation is a re-plan: the student's next
+Paths choose route. A rethink or a PAI OS escalation is a re-plan: the student's next
 fact must not undo it; only their own act (choosing, or asking for paths and
 getting them) ends it. Fake models only.
 """
@@ -21,11 +21,12 @@ from app.journey import JourneyService
 from app.main import app
 from app.models import BackgroundJob, StudentJourney, VaultItem
 from app.pai_c.mirror import MirrorEngine
+from app.pai_c.paths.choice import PathChoiceService
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import client_for, fake_post, prepare
 from tests.test_mirror_engine import _education, _record
 from tests.test_mirror_gate_removed import accept_item, stage
-from tests.test_roadmap_engine import add_education, add_path, field_title, fsc
+from tests.test_path_eligibility import add_education, add_path, field_title, fsc
 
 HEADERS = {"X-Workspace-Token": "synthetic-test-only"}
 CHANNEL = "channel/pai-counselor"
@@ -42,17 +43,18 @@ def make_ready(db, ws):
 
 def proposed_student(student, db):
     """The reviewer's probe setup: a ready Mirror, then a path, then one more
-    fact. Each move is made by the reconciler's Mirror hook."""
+    fact. Each move is made by the reconciler's Mirror hook. Returns the
+    journey and the path's possibility id."""
     ws = student.workspace_id
     _, journey, _ = prepare(student, db)
     make_ready(db, ws)
     assert stage(db, journey.id) == "MIRROR"
     # Still the current education: an onboarded student always has a status (city, current level).
     add_education(student, db, fsc("pre_engineering", 78, academic_status="current"))
-    add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
+    path = add_path(student, db, field_title("electrical_engineering"), "electrical_engineering")
     accept_item(db, ws, "interest", {"text": "Drawing"})
     assert stage(db, journey.id) == "PROPOSED"
-    return journey
+    return journey, path.id
 
 
 async def rethink(db, student, journey_id):
@@ -89,15 +91,22 @@ async def replan(kind, db, student, journey_id):
     assert stage(db, journey_id) == "DIRECTION"
 
 
-def choose(student, field_key):
+def _post(student, possibility_id, action):
     client = client_for(student)
     try:
-        response = client.post("/v1/roadmap/choose", params={"network": student.workspace_id}, headers=HEADERS,
-                               json={"field_key": field_key})
+        response = client.post(f"/v1/counselor/possibilities/{possibility_id}/{action}",
+                               params={"network": student.workspace_id}, headers=HEADERS)
     finally:
         app.dependency_overrides.pop(get_db, None)
     assert response.status_code == 200, response.text
     return response.json()["data"]
+
+
+def choose(student, possibility_id):
+    """Choose on the Paths page; returns the decision record."""
+    assert _post(student, possibility_id, "choose")["id"] == possibility_id
+    with student.factory() as fresh:
+        return PathChoiceService(fresh).current(student.workspace_id)
 
 
 async def run_paths(student, db, *, reason, channel=None):
@@ -133,7 +142,7 @@ def seed_for_paths(student, db):
 @pytest.mark.parametrize("kind", ["rethink", "escalation"])
 async def test_one_fact_after_a_replan_stays_in_direction(kind):
     with StudentSession() as student, student.factory() as db:
-        journey = proposed_student(student, db)
+        journey, _ = proposed_student(student, db)
         await replan(kind, db, student, journey.id)
         accept_item(db, student.workspace_id, "interest", {"text": "Music"})
         assert MirrorEngine(db).ready(student.workspace_id)
@@ -145,15 +154,34 @@ async def test_one_fact_after_a_replan_stays_in_direction(kind):
 @pytest.mark.parametrize("kind", ["rethink", "escalation"])
 async def test_choosing_after_a_replan_ends_it(kind):
     with StudentSession() as student, student.factory() as db:
-        journey = proposed_student(student, db)
-        first = choose(student, "electrical_engineering")
+        journey, electrical = proposed_student(student, db)
+        computer = add_path(student, db, field_title("computer_engineering"), "computer_engineering").id
+        first = choose(student, electrical)
         assert stage(db, journey.id) == "CHOSEN"
         await replan(kind, db, student, journey.id)
         accept_item(db, student.workspace_id, "interest", {"text": "Music"})
-        assert stage(db, journey.id) == "DIRECTION"  # the kept route does not pull it back
-        decision = choose(student, "electrical_engineering")
+        assert stage(db, journey.id) == "DIRECTION"  # the kept choice does not pull it back
+        decision = choose(student, computer)
         assert decision["id"] != first["id"]
         assert stage(db, journey.id) == "CHOSEN"
+        db.expire_all()
+        row = db.get(StudentJourney, journey.id)
+        assert row.replan_at is None and row.active_goal["route_decision_id"] == decision["id"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["rethink", "escalation"])
+async def test_withdrawing_and_choosing_the_same_path_again_after_a_replan_ends_it(kind):
+    with StudentSession() as student, student.factory() as db:
+        journey, electrical = proposed_student(student, db)
+        first = choose(student, electrical)
+        await replan(kind, db, student, journey.id)
+        _post(student, electrical, "withdraw")
+        assert stage(db, journey.id) == "DIRECTION"  # a withdraw is no student re-choice
+        decision = choose(student, electrical)
+        assert decision["id"] != first["id"]
+        assert stage(db, journey.id) == "CHOSEN"
+        db.expire_all()
         row = db.get(StudentJourney, journey.id)
         assert row.replan_at is None and row.active_goal["route_decision_id"] == decision["id"]
 

@@ -18,7 +18,7 @@ confirmed" and the whole estimate uncertain; nothing is guessed.
 from datetime import date
 
 from app.pai_c.roadmap import calendar as cal
-from app.pai_c.roadmap.rules import rule_for
+from app.pai_c.paths.admission import rule_for
 
 _WEAKEST = {name: rank for rank, name in enumerate(cal.CONFIDENCE)}
 

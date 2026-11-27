@@ -152,7 +152,7 @@ def candidate_fields(education_record: dict | None) -> dict[str, Candidate]:
 
 
 def current_education(records: list[dict]) -> dict | None:
-    """The education record paths and the roadmap read: the most recent
+    """The education record paths and their eligibility read: the most recent
     current one, else the highest completed level (catalog level_ranks, ties to
     the most recent), else the most recent. Records arrive newest first
     (StudentRecordService.list orders by updated_at), so the student's latest

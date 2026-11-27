@@ -16,9 +16,10 @@ from tests.test_director_drive import inputs, signals
 ASK = {"text": "PAI kaise kaam karta hai?", "kind": "about_pai", "needs_research": False, "needs_context": False}
 
 
-def test_about_pai_data_covers_the_four_features_and_limits():
+def test_about_pai_data_covers_the_three_features_and_limits():
+    # The Roadmap page is gone from PAI C (Paths only); the route plan belongs to PAI OS.
     data = controller.load_data("about_pai.json")
-    assert set(data["features"]) == {"Vault", "Mirror", "Paths", "Roadmap"}
+    assert set(data["features"]) == {"Vault", "Mirror", "Paths"}
     for key in ("what_pai_is", "your_words", "how_paths_are_made"):
         assert data[key].strip()
     assert len(data["will_not_do"]) == 3

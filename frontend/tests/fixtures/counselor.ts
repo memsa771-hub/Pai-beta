@@ -1,11 +1,7 @@
-import type {
-  LivingPicture,
-  PathResult,
-  Programs,
-} from "@/lib/counselor-workspace";
+import type { LivingPicture } from "@/lib/counselor-workspace";
 import type { Possibility } from "@/lib/possibilities";
 import type { VaultCatalog, VaultEntry, VaultView } from "@/lib/vault";
-import type { ChosenRoute, FieldCard, RoadmapPage, RouteStep, RouteTime, Verdict } from "@/lib/roadmap";
+import type { PathComparison, Verdict } from "@/lib/path-compare";
 import type { MirrorCard } from "@/lib/mirror";
 import type { AdminUsage } from "@/lib/api";
 export const possibilities: Possibility[] = [
@@ -226,117 +222,26 @@ export const vaultCatalog: VaultCatalog = { types: [
   { key: "myth", label: "Myth", storage: "item", shown_on: "story", section: null, inputs: ["chat", "story"],
     schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, about: { type: "string" } } }, choices: {} },
 ] };
-export const pathResult: PathResult = {
-  possibility: possibilities[0],
-  status: "completed",
-  path: {
-    what_it_is: "Design turns an idea into something people can use.",
-    what_you_study: ["Drawing ideas", "Materials", "Testing prototypes"],
-    work_day: "A day might include sketching, making and testing.",
-    skills: ["Observation", "Iteration", "Practical problem solving"],
-    fit_for: [
-      {
-        observation: "Practical work seems worth exploring.",
-        evidence: "I fixed a broken lamp with my friend.",
-      },
-    ],
-    fit_against: [],
-    ways_in: ["Read a course outline", "Try a small project"],
-    try_it:
-      "Sketch an improvement to an everyday object, then try a paper prototype.",
-  },
-  facts: [],
-  missing: ["verified_career_sources"],
-};
-export const programs: Programs = {
-  status: "completed",
-  programs: [],
-  missing: ["verified_program_sources"],
-};
-
-// The Roadmap page for an FSc Pre-Engineering student with 78%: the shape of
-// backend RoadmapEngine.build (app/pai_c/roadmap/engine.py).
+// The Paths Compare table for an FSc Pre-Engineering student with 78%: the
+// shape of backend GET /v1/counselor/possibilities/compare
+// (app/pai_c/paths/eligibility.py).
 const verdict = (v: Partial<Verdict>): Verdict => ({
   status: "open", reasons: [], needs: [], tests: [], years: null, min_percent: null, student_percent: 78,
-  confidence: "official", sources: [], subjects: [], ...v,
+  confidence: "official", sources: ["https://www.pec.org.pk/regulations.pdf"], ...v,
 });
-const result = { id: "education:fsc", level: "shown" as const, source_label: "Result card.jpg" };
-const PEC = { source: "https://www.pec.org.pk/regulations.pdf", confidence: "official" as const };
-const step = (key: string, label_key: string, values: Record<string, unknown>, status: RouteStep["status"],
-  over: Partial<RouteStep> = {}): RouteStep => ({ key, kind: key.split(":")[0], label_key, values, status,
-  colour: ({ done: "green", half: "yellow", not: "red" } as const)[status], evidence: null, rule: null, manual_done: false,
-  tickable: false, ...over });
-const finish = step("complete_intermediate", "step_finish_exam", { level: "FSc", month: "May", year: 2027 }, "half", { evidence: result });
-const group = step("group", "step_group", { groups: [{ code: "pre_engineering", label: "Pre-Engineering", route_label: "FSc Pre-Engineering" }] },
-  "done", { evidence: result, rule: PEC });
-const basis = (step: string | null, event_key: string, month: number | null, year: number | null, confidence = "official") =>
-  ({ step, event_key, month, year, source: month ? "https://ecat.uet.edu.pk/" : null, confidence });
-export const eeSteps: RouteStep[] = [
-  group, finish,
-  step("marks", "step_marks", { min: 60, have: 78 }, "done", { evidence: result, rule: PEC }),
-  step("test:ECAT / NET", "step_test_pass", { name: "ECAT / NET", pass: 33 }, "not",
-    { kind: "test", tickable: true, rule: { source: "https://ecat.uet.edu.pk/", confidence: "official" } }),
-  step("apply", "step_apply", { degree: "Electrical Engineering" }, "not", { tickable: true }),
-  step("degree", "step_degree", { degree: "Electrical Engineering", years: 4 }, "not", { rule: PEC }),
-];
-export const eeTime: RouteTime = {
-  to_entry_months: 11, to_finish_years: 4.9, degree_years: 4, confidence: "secondary",
-  next_intake: { label: "September intake", start_month: 9, year: 2027 },
-  basis: [basis("complete_intermediate", "hssc_part2_exam", 5, 2027, "secondary"), basis("complete_intermediate", "hssc_part2_result", 9, 2027, "secondary"),
-    basis("test:ECAT / NET", "ecat", 6, 2027), basis("test:ECAT / NET", "ecat:result", 6, 2027), basis(null, "nust_ug", 9, 2027)],
-};
-const pharmSteps: RouteStep[] = [
-  { ...group, rule: { source: "https://example.org/pharm", confidence: "uncertain" } }, finish,
-  step("marks", "step_marks", { min: 60, have: 78 }, "done", { evidence: result }),
-  step("bridge", "step_bridge", { text: "Biology bridge course at some universities" }, "not",
-    { tickable: true, rule: { source: "https://example.org/pharm", confidence: "uncertain" } }),
-  step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test", tickable: true }),
-  step("apply", "step_apply", { degree: "Pharmacy" }, "not", { tickable: true }),
-  step("degree", "step_degree", { degree: "Pharmacy", years: 5 }, "not"),
-];
-const pharmTime: RouteTime = {
-  to_entry_months: null, to_finish_years: null, degree_years: 5, confidence: "uncertain", next_intake: null,
-  basis: [basis("complete_intermediate", "hssc_part2_exam", 5, 2027, "secondary"), basis("test:University test", "", null, null, "uncertain")],
-};
-export const roadmapCards: FieldCard[] = [
-  { possibility_id: "path-ee", field_key: "electrical_engineering", title: "Electrical Engineering", family: "engineering",
-    why: "You like finding out how circuits and machines work.", status: "open",
-    verdict: verdict({ tests: [{ name: "ECAT / NET", pass_percent: 33 }], years: 4, min_percent: 60,
-      sources: ["https://www.pec.org.pk/regulations.pdf"] }), steps: eeSteps, time: eeTime },
-  { possibility_id: "path-cs", field_key: "computer_science", title: "Computer Science", family: "computing",
-    why: "You kept changing your project until it worked.", status: "open",
-    verdict: verdict({ tests: [{ name: "University test", pass_percent: null }], years: 4, min_percent: 50,
-      confidence: "secondary", sources: ["https://www.hec.gov.pk/criteria"] }),
-    steps: [group, finish, step("marks", "step_marks", { min: 50, have: 78 }, "done", { evidence: result }),
-      step("test:University test", "step_test", { name: "University test" }, "not", { kind: "test", tickable: true }),
-      step("apply", "step_apply", { degree: "Computer Science" }, "not", { tickable: true }), step("degree", "step_degree", { degree: "Computer Science", years: 4 }, "not")],
-    time: { ...eeTime, to_entry_months: 10, to_finish_years: 4.8, confidence: "uncertain" } },
-  { possibility_id: "path-pharm", field_key: "pharmacy", title: "Pharmacy", family: "health",
-    why: "You are curious about how medicines help people.", status: "step",
-    verdict: verdict({ status: "step", reasons: [{ key: "rule_step", text: "Biology bridge course at some universities" }],
-      needs: [{ kind: "bridge", detail: { text: "Biology bridge course at some universities", source: "https://example.org/pharm" } }],
-      tests: [{ name: "University test", pass_percent: null }], years: 5, min_percent: 60, confidence: "uncertain",
-      sources: ["https://example.org/pharm"] }), steps: pharmSteps, time: pharmTime },
-  { possibility_id: "path-mbbs", field_key: "mbbs", title: "MBBS", family: "health",
-    why: "You said you want to help people directly.", status: "not_open",
-    verdict: verdict({ status: "not_open", reasons: [{ key: "not_open_group", group_code: "pre_engineering", group_label: "Pre-Engineering" }],
-      tests: [{ name: "MDCAT", pass_percent: 55 }], years: 5, min_percent: 60, sources: ["https://pmdc.pk/regulations"] }) },
-  { possibility_id: "path-game", field_key: null, title: "Game design", family: null,
-    why: "You enjoy making small games.", status: "unknown",
-    verdict: verdict({ status: "unknown", reasons: [{ key: "cannot_check" }], confidence: null }) },
-];
-export const chosenRoute: ChosenRoute = {
-  id: "route-one", field_key: "electrical_engineering", possibility_id: "path-ee", title: "Electrical Engineering",
-  chosen_at: "2026-10-20T10:00:00Z", steps: eeSteps, time: eeTime,
-  snapshot_steps: eeSteps.map(({ key, label_key, values, status }) => ({ key, label_key, values, status })),
-  steps_done: [], snapshot_verdict: roadmapCards[0].verdict, live_status: "open",
-};
-export const roadmapPage: RoadmapPage = {
+export const pathComparison: PathComparison = {
   education_line: { level: "fsc", level_label: "FSc", groups: [{ code: "pre_engineering", label: "Pre-Engineering" }], percent: 78 },
-  counts: { open: 2, step: 1, not_open: 1, unknown: 1 },
-  fields: roadmapCards,
-  chosen: null,
   rules_as_of: "2026-10",
+  paths: [
+    { id: "path-one", verdict: verdict({ tests: [{ name: "ECAT / NET", pass_percent: 33 }], years: 4, min_percent: 60 }) },
+    { id: "path-two", verdict: verdict({ status: "step", reasons: [{ key: "rule_step", text: "Biology bridge course at some universities" }],
+      needs: [{ kind: "bridge", detail: { text: "Biology bridge course at some universities" } }],
+      tests: [{ name: "University test", pass_percent: null }], years: 5, min_percent: 60,
+      confidence: "uncertain", sources: ["https://example.org/pharm"] }) },
+    { id: "path-three", verdict: verdict({ status: "not_open",
+      reasons: [{ key: "not_open_group", group_code: "pre_engineering", group_label: "Pre-Engineering" }],
+      tests: [{ name: "MDCAT", pass_percent: 55 }], years: 5, min_percent: 60 }) },
+  ],
 };
 
 // The Mirror state card (backend app/pai_c/mirror/engine.py): an FSc

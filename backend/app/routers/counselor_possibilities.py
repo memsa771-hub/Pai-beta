@@ -65,11 +65,48 @@ def path_analysis_status(network: str = Query(...), db=Depends(get_db),
                              "outcome": (job.result or {}).get("status")})
 
 
+@router.get("/compare")
+def compare_paths(ids: list[str] = Query(default=[]), network: str = Query(...), db=Depends(get_db),
+                  x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
+    """The Paths eligibility read: for each asked-for live path, whether the
+    student can get into its field from their education and what stands
+    between. Shown as each row's badge and in the Compare table; read now, so
+    it follows the Vault."""
+    from app.pai_c.paths.eligibility import compare
+    workspace = _authorized(db, network, x_workspace_token, authorization)
+    return success_response(compare(db, str(workspace.id), ids))
+
+
+def _choice(workspace_id: str, possibility_id: str, action: str, db):
+    """Choose a path (the decision record PAI OS reads), or withdraw the choice."""
+    from app.pai_c.paths.choice import PathChoiceError, PathChoiceService
+    from sqlalchemy.exc import IntegrityError
+    service = PathChoiceService(db)
+    try:
+        if action == "choose":
+            service.choose(workspace_id, possibility_id)
+        else:
+            row = service.active(workspace_id)
+            if row is None or row.possibility_id != possibility_id:
+                raise PathChoiceError("This path is not your chosen path", 409)
+            service.withdraw(workspace_id)
+    except PathChoiceError as exc:
+        db.rollback()
+        raise HTTPException(exc.status_code, str(exc)) from exc
+    except IntegrityError as exc:  # a concurrent choice won the one-active-choice index
+        db.rollback()
+        raise HTTPException(409, "Another path was just chosen; reload the page") from exc
+    db.commit()
+    return success_response(PossibilityService(db).serialize(PossibilityService(db).get(workspace_id, possibility_id)))
+
+
 @router.post("/{possibility_id}/{action}")
 async def change_possibility(possibility_id: str, action: str, network: str = Query(...), db=Depends(get_db),
                              x_workspace_token: str | None = Header(None), authorization: str | None = Header(None)):
     workspace = _authorized(db, network, x_workspace_token, authorization)
     workspace_id = str(workspace.id)
+    if action in {"choose", "withdraw"}:
+        return _choice(workspace_id, possibility_id, action, db)
     service = PossibilityService(db)
     previous_status = None
     try:

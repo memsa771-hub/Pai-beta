@@ -26,7 +26,7 @@ from app.pai_c.paths.currency import current_relevance
 from app.plugins._shared.budget import bounded_research, daily_key, spend
 from scripts.counselor_eval_support import StudentSession
 from tests.counselor_fixtures import client_for
-from tests.test_roadmap_engine import add_path, field_title
+from tests.test_path_eligibility import add_path, field_title
 
 BACKEND = Path(__file__).resolve().parents[1]
 HEADERS = {"X-Workspace-Token": "synthetic-test-only"}
@@ -53,7 +53,9 @@ def city(db, ws, value="Lahore"):
 # ---- the daily research budget -------------------------------------------------------
 
 def test_two_vault_versions_on_one_day_share_one_allowance_and_a_new_day_starts_another():
-    day = datetime(2026, 10, 29, 9, tzinfo=timezone.utc)
+    # Today, not a fixed date: counters older than the budget's keep window are pruned
+    # against the real clock, so a frozen past day would silently lose its counter.
+    day = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
     with StudentSession() as student, student.factory() as db, \
             patch.object(config, "PAI_RESEARCH_MAX_CALLS_PER_STUDENT", 1):
         def attempt(now):

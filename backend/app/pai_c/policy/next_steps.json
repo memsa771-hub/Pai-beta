@@ -1,5 +1,5 @@
 {
-  "_note": "The drive rule (BETA_CONVERSATION_SPEC 2.3): every reply except care (and a student who said stop) ends with the next step, one question or one concrete action. The Writer returns it as the JSON field next_step, posted as the reply's last line. The phase comes from the counselor journey stage. In a phase that asks, a reply allowed a question, or one of question_after_actions (answering a request), ends with the next bank question, else the next missing education basic (basic_question); otherwise with the phase line, a concrete action that names a workspace place. In the chosen phase, step_line names the chosen route's first open step (its roadmap.json copy). Lines are English; they are shown in the student's language through the rendered copy cache.",
+  "_note": "The drive rule (BETA_CONVERSATION_SPEC 2.3): every reply except care (and a student who said stop) ends with the next step, one question or one concrete action. The Writer returns it as the JSON field next_step, posted as the reply's last line. The phase comes from the counselor journey stage. In a phase that asks, a reply allowed a question, or one of question_after_actions (answering a request), ends with the next bank question, else the next missing education basic (basic_question); otherwise with the phase line, a concrete action that names a workspace place. Lines are English; they are shown in the student's language through the rendered copy cache.",
   "default_phase": "getting_to_know",
   "stage_phase": {
     "IDENTITY": "getting_to_know",
@@ -26,14 +26,13 @@
     },
     "proposed": {
       "ask": false,
-      "place": "roadmap",
-      "line": "Your fields are on the Roadmap page: open it and pick the one you want to look at first."
+      "place": "paths",
+      "line": "Your paths are on the Paths page: compare them side by side and choose the one you want to follow."
     },
     "chosen": {
       "ask": false,
-      "place": "roadmap",
-      "line": "Your next step is on the Roadmap page: open your route and do the first open step.",
-      "step_line": "Your next step is {step}: open your route on the Roadmap page and tick it off when it is done."
+      "place": "paths",
+      "line": "Ask me anything about the path you chose, or open the Paths page to compare it with another path."
     }
   },
   "question_after_actions": [

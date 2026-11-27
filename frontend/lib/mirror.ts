@@ -2,7 +2,7 @@
  * computed from the Vault on every read by backend app/pai_c/mirror/engine.py.
  * Entry text is English display text, never the student's own words. */
 import type { VaultLevel } from "./vault";
-import type { EducationLine } from "./roadmap";
+import type { EducationLine } from "./path-compare";
 
 /** An entry as the Mirror names it: `fact:<type>`, `<record type>:<id>` or `item:<id>`. */
 export type MirrorEntry = {

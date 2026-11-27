@@ -109,7 +109,7 @@ def sample(schema, schemas):
 
 
 SPEC = app.openapi()
-PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/roadmap', '/v1/vault',
+PREFIXES = ('/v1/events', '/v1/counselor/', '/v1/decision-records', '/v1/vault',
             '/v1/student-requests', '/v1/files')
 CASES = [(path, method, spec) for path, methods in SPEC['paths'].items()
          if path.startswith(PREFIXES) for method, spec in methods.items()
@@ -178,6 +178,15 @@ def test_folder_noop_still_works_for_authenticated_owner():
                 json={'network': student.workspace_id, 'path': 'folder', 'new_path': 'folder'})
             assert result.status_code == 200
             assert result.json()['data']['updated'] == 0
+
+
+def test_the_roadmap_routes_are_absent_from_the_spec():
+    assert not any(path.startswith('/v1/roadmap') for path in SPEC['paths'])
+    assert '/v1/decision-records/current' in SPEC['paths']
+    for path in ('/v1/counselor/possibilities/{possibility_id}/{action}', '/v1/counselor/possibilities/compare'):
+        assert path in SPEC['paths'], path
+    covered = {path for path, _, _ in CASES}
+    assert '/v1/decision-records/current' in covered and '/v1/counselor/possibilities/compare' in covered
 
 
 def test_pai_os_contract_names_and_service_token_rejection():

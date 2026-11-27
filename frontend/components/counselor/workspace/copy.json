@@ -8,7 +8,6 @@
     "journey": "Your journey",
     "paths": "Paths",
     "profile": "Your profile",
-    "roadmap": "Roadmap",
     "files": "Documents",
     "settings": "Settings",
     "notifications": "Notifications"
@@ -17,8 +16,6 @@
   "loading": "Loading your workspace…",
   "error": "This could not load. Your information has not changed.",
   "retry": "Try again",
-  "back": "Back to paths",
-  "refresh": "Refresh",
   "empty": "Nothing here yet. Keep talking with PAI and this picture will grow.",
   "profileTitle": "A living picture of you",
   "profileIntro": "Built from your words and evidence. You can always correct it.",
@@ -53,13 +50,18 @@
   "journeyIntro": "A conversation, not a checklist. Revisit any step when your situation changes.",
   "moment": "Open conversation",
   "later": "When you are ready",
-  "pathsTitle": "Directions worth exploring",
-  "pathsIntro": "Understand the path before choosing a place. These are possibilities, not decisions made for you.",
-  "explore": "Explore",
+  "pathsTitle": "Your paths",
+  "pathsIntro": "Compare the paths that fit you and choose one. Then ask PAI anything about it in the chat. These are possibilities, not decisions made for you.",
+  "choose": "Choose",
+  "chooseTitle": "Choose {title}?",
+  "chooseBody": "This becomes your path. PAI will help you with it in the chat, and you can choose another path later.",
+  "chooseYes": "Yes, choose it",
+  "chooseNo": "Not now",
+  "askAbout": "Ask PAI",
+  "askTopic": "I chose {title}. Tell me more about this path.",
   "notForMe": "Not for me",
   "why": "Why it fits you",
   "fitTitle": "How it fits you",
-  "fitLegend": "Checked against what you shared. Grey means PAI does not know yet, not that it is bad.",
   "fitStatus": {
     "have": "You have this",
     "partial": "Partly there",
@@ -91,21 +93,7 @@
     "other": "{count} paths, each checked against what you shared."
   },
   "pathsFoundOpen": "Open your paths",
-  "pathLoading": "PAI is working on this path. You can keep chatting while it checks.",
-  "pathEmpty": "Explore this path to learn what it involves.",
-  "places": "Where could I study this?",
-  "placesIntro": "Only for this path. Sources and dates stay visible; missing information stays unknown.",
-  "placesConsent": "I want to look at places for this path",
-  "search": "Look at programs",
   "missingResearch": "Some information still needs checking.",
-  "unconfirmed": "Unconfirmed",
-  "verified": "Verified",
-  "noPrograms": "No verified program information is available yet. PAI will need more evidence before making a comparison.",
-  "route": "A route to get there",
-  "sourceDate": "Checked",
-  "tryIt": "Try it gently",
-  "reflection": "Tell PAI what you noticed",
-  "decisionPending": "The Roadmap shows whether this field is open from your education and the steps to get in. PAI will not choose for you.",
   "checkin": "How is it going?",
   "settingsTitle": "Make this space yours",
   "theme": "Appearance",
@@ -137,26 +125,6 @@
     "sure": "Certainty",
     "goals": "Goals & whose wish",
     "options": "Options & myths"
-  },
-  "pathSections": {
-    "what_it_is": "What it is",
-    "what_you_study": "What you study",
-    "work_day": "A day at work",
-    "skills": "Skills you use",
-    "fit_for": "What fits",
-    "fit_against": "What to test",
-    "ways_in": "Ways in",
-    "myths": "Myths & reality",
-    "jobs": "Jobs",
-    "future": "Looking ahead"
-  },
-  "eligibility": {
-    "unknown": "Needs checking",
-    "eligible": "Entry rules met — admission is not guaranteed",
-    "not_yet": "Not yet",
-    "safe": "Safe",
-    "realistic": "Realistic",
-    "stretch": "Stretch"
   },
   "stages": [
     {
@@ -206,36 +174,36 @@
     },
     {
       "id": "G",
-      "title": "Understand a path",
+      "title": "Compare your paths",
       "view": "paths",
       "signal": "path_explored",
       "tone": "teal"
     },
     {
       "id": "H",
-      "title": "Where to study",
-      "view": "paths",
+      "title": "Ask about a path",
+      "view": "threads",
       "signal": "places_searched",
       "tone": "blue"
     },
     {
       "id": "I",
-      "title": "Choose your route",
-      "view": "roadmap",
+      "title": "Choose your path",
+      "view": "paths",
       "signal": "route_chosen",
       "tone": "violet"
     },
     {
       "id": "J",
       "title": "Make a plan",
-      "view": "roadmap",
-      "signal": "route_step_done",
+      "view": "threads",
+      "signal": "never",
       "tone": "amber"
     },
     {
       "id": "K",
       "title": "Stay in touch",
-      "view": "roadmap",
+      "view": "threads",
       "signal": "never",
       "tone": "rose"
     }
@@ -246,8 +214,6 @@
   "deleteNow": "Delete my account",
   "deleteNeedsSignIn": "For your safety, sign in again, then delete your account.",
   "deleteSignInAgain": "Sign in again",
-  "fees": "Fees & funding",
-  "openRoadmap": "Open Roadmap",
   "onboardingError": "Profile setup could not load",
   "onboardingRetry": "Please retry to finish setting up your profile.",
   "firstPicture": "My first picture of you",
@@ -277,9 +243,6 @@
     "development_need": "Development need",
     "blocked": "Blocked"
   },
-  "stalePath": "Some sources need a fresh check. The older claims are hidden until they are checked again.",
-  "acceptActivity": "I'll try this",
-  "activityScheduled": "PAI will check in here",
   "emptyTitle": "Nothing here yet",
   "stageDescriptions": {
     "A": "Your name, studies, date of birth and where you live.",
@@ -288,10 +251,10 @@
     "D": "You go deeper on what matters most.",
     "E": "PAI draws what it knows about you from your Vault. Anything wrong, you fix in the Vault.",
     "F": "Directions worth exploring, each with a reason from your own words.",
-    "G": "What a path involves, a day at work, and a small way to try it.",
-    "H": "Places to study this path, with sources and dates.",
-    "I": "Compare the trade-offs and make a choice that is yours.",
-    "J": "Small next steps for the route you chose.",
+    "G": "See two or three paths side by side: how each fits you and what it takes to get in.",
+    "H": "Ask PAI in the chat about the path you are leaning towards.",
+    "I": "Choose the path that is yours. You can change it later.",
+    "J": "Your plan for the path you chose comes next.",
     "K": "Check in when you try something, get a result or change your mind."
   },
   "shell": {
@@ -344,32 +307,6 @@
   "pathsEmptyBody": "PAI suggests paths once it understands you a little. Keep talking, or tell PAI about a direction you are curious about.",
   "openChat": "Talk with PAI",
   "dismissedTitle": "Not for me ({count})",
-  "pathIntro": "What this path involves, in plain words. Places come later, only when you ask.",
-  "needsChecking": "Needs checking",
-  "needsCheckingBody": "PAI has not found a trusted source for this yet. It stays unknown rather than guessed.",
-  "placesCta": "Ready to look at places?",
-  "consentTitle": "Before PAI looks at places",
-  "consentBody": "PAI will search for programs for this path only. Each result shows its source and the date it was checked. Nothing about you is shared with any university.",
-  "programsLoading": "PAI is checking programs for this path. You can keep chatting meanwhile.",
-  "eligibilityTitle": "Your fit",
-  "rulesTitle": "Entry rules",
-  "programsFound": {
-    "one": "{count} program with sources",
-    "other": "{count} programs with sources"
-  },
-  "nextStepTitle": "Next: your Roadmap",
-  "pathSectionIcons": {
-    "what_it_is": "book",
-    "what_you_study": "graduation",
-    "work_day": "sun",
-    "skills": "wrench",
-    "fit_for": "thumbs",
-    "fit_against": "flask",
-    "ways_in": "door",
-    "myths": "help",
-    "jobs": "briefcase",
-    "future": "telescope"
-  },
   "documents": {
     "upload": "Upload a document",
     "whyTitle": "Why upload?",
@@ -464,7 +401,6 @@
       "none": "No model calls yet this month."
     }
   },
-  "placesOpen": "Look at places",
   "notSet": "Not set",
   "sections": {
     "overview": {
@@ -475,9 +411,9 @@
       "label": "PAI",
       "hint": "Talk with your counselor"
     },
-    "roadmaps": {
-      "label": "Roadmaps",
-      "hint": "Paths and where you can go"
+    "paths": {
+      "label": "Paths",
+      "hint": "Compare and choose your path"
     },
     "journey": {
       "label": "Journey",
@@ -496,7 +432,6 @@
     "overview": "Overview",
     "mirror": "Mirror",
     "paths": "Paths",
-    "roadmap": "Roadmap",
     "files": "Documents",
     "profile": "About you"
   },
@@ -508,7 +443,7 @@
         "to": "E"
       },
       {
-        "label": "Explore",
+        "label": "Your paths",
         "from": "F",
         "to": "H"
       },
@@ -533,8 +468,8 @@
     "title": "Find the path that fits you.",
     "intro": "Your signals, strongest paths and the next best step, in one place.",
     "metrics": {
-      "paths": "Paths to explore",
-      "pathsSub": "{saved} saved · {exploring} exploring",
+      "paths": "Your paths",
+      "pathsSub": "{saved} saved · {chosen} chosen",
       "pathsNone": "Talk with PAI to find your first",
       "journey": "Your journey",
       "journeySub": "Now: {title}",
@@ -565,9 +500,13 @@
     "recMissingBody": "PAI gives better suggestions when it knows the basics.",
     "recMissingAction": "Add with PAI",
     "recMissingDraft": "I want to add my {label}.",
-    "recPathTitle": "Take a closer look at {title}.",
-    "recPathBody": "What it is, a day at work, and a small way to try it.",
-    "recPathAction": "Open the path",
+    "recPathTitle": "Compare your paths and choose one.",
+    "recPathBody": "See your paths side by side, then choose the one you want to follow.",
+    "recPathAction": "Open Paths",
+    "recChosenTitle": "Ask PAI about {title}.",
+    "recChosenBody": "You chose this path. Ask anything about it in the chat.",
+    "recChosenAction": "Ask PAI",
+    "recChosenDraft": "I chose {title}. Tell me more about this path.",
     "recAlso": "Also: {items}",
     "recPrev": "Previous recommendation",
     "recNext": "Next recommendation",
@@ -589,12 +528,54 @@
     "DIRECTION": 3,
     "MIRROR": 5
   },
-  "roadmap": {
-    "title": "Where you can go",
-    "intro": "Fields from your paths, checked against your education.",
-    "updateVault": "Update in Vault",
+  "compare": {
+    "title": "Compare paths",
+    "intro": "The same facts for each path, side by side. Entry facts are read from your education in your Vault.",
+    "badgeTitle": "Whether your education opens this field, from your Vault. It never stops you from choosing.",
+    "hint": "Tick 2 or 3 paths to compare them side by side.",
+    "toggle": "Compare {title}",
+    "bar": "Compare ({n})",
+    "pickMore": "Pick {n} more to compare",
+    "max": "You can compare up to {n} paths",
+    "clear": "Clear",
+    "corner": "Path",
+    "loading": "Loading the comparison",
+    "error": "The comparison could not load. Try again.",
+    "limits": {
+      "min": 2,
+      "max": 3
+    },
+    "rows": {
+      "fit": "How it fits you",
+      "why": "Why it fits",
+      "status": "Can you get in",
+      "marks": "Marks needed vs yours",
+      "step": "Extra step",
+      "test": "Entry test",
+      "years": "Years",
+      "source": "Rule source"
+    },
+    "status": {
+      "open": "Open",
+      "step": "Needs a step",
+      "not_open": "Not open",
+      "unknown": "Cannot check yet"
+    },
     "groupJoiner": " or ",
-    "officialConfidence": "official",
+    "notKnown": "Not known",
+    "facts": {
+      "years": "{n} years",
+      "noTest": "No entry test listed",
+      "marksCompare": "{min}% · you {have}%"
+    },
+    "step": {
+      "none": "None",
+      "marks": "Marks up to {min}%",
+      "bridge": "Bridge or extra courses",
+      "check": "Check with the university",
+      "group": "Choose {groups}",
+      "any_group": "Choose an intermediate group"
+    },
     "templates": {
       "needs_percent": "Needs {min}%; you have {have}%",
       "add_marks": "Add your marks to check the {min}% rule",
@@ -605,166 +586,16 @@
       "not_open_group": "Not open from {group_label}",
       "cannot_check": "PAI cannot check this field yet",
       "undergrad_only": "Undergraduate entry rules only for now",
-      "needs_education": "Tell PAI your education first",
-      "check_with_university": "Check with the university",
-      "step_marks": "Meet the {min}% marks rule (you have {have}%)",
-      "step_bridge": "{text}",
-      "step_check": "{note}",
-      "step_group": "Choose {groups} in intermediate",
-      "step_any_group": "Choose any group in intermediate",
-      "step_test": "Take {name}",
-      "step_apply": "Apply for {degree}",
-      "step_finish": "Finish {level}",
-      "step_finish_exam": "Finish {level} (exam {month} {year})",
-      "step_finish_intermediate": "Finish intermediate",
-      "step_marks_unknown": "Meet the {min}% marks rule (add your marks)",
-      "step_strengthen": "Strengthen {subject}",
-      "step_test_pass": "Take {name} (pass {pass}%)",
-      "step_degree": "Study {degree} ({years} years)",
-      "step_degree_years_unknown": "Study {degree}",
-      "step_tell_education": "Tell PAI your education",
-      "status_done": "Done",
-      "status_half": "Partly done",
-      "status_not": "Not yet",
-      "marked_by_you": "You marked it",
-      "date_not_confirmed": "Date not confirmed",
-      "time_to_entry": "About {months} months to entry",
-      "time_to_finish": "About {years} years to finish",
-      "time_uncertain": "Dates not confirmed; check the official schedule"
-    },
-    "educationLine": {
-      "with_percent": "From {level} {groups}, {percent}%",
-      "without_percent": "From {level} {groups}",
-      "groups_joiner": " / "
-    },
-    "status": {
-      "open": "Open",
-      "step": "Needs a step",
-      "not_open": "Not open",
-      "unknown": "Cannot check yet"
-    },
-    "counts": {
-      "open": "{n} open",
-      "step": "{n} need a step",
-      "not_open": "{n} not open",
-      "unknown": "{n} cannot check"
-    },
-    "groups": {
-      "open": "You can go",
-      "step": "Possible with a step",
-      "not_open": "Not open from your group",
-      "unknown": "PAI cannot check these yet"
-    },
-    "facts": {
-      "years": "{n} years",
-      "needsYou": "Needs {min}% · you {have}%",
-      "needs": "Needs {min}%",
-      "noTest": "No entry test listed",
-      "marksCompare": "{min}% · you {have}%"
-    },
-    "checkUniversity": "Check with the university",
-    "compareToggle": "Compare {title}",
-    "compareBar": "Compare ({n})",
-    "comparePickMore": "Pick {n} more to compare",
-    "compareMax": "You can compare up to {n} fields",
-    "compareClear": "Clear",
-    "compareTitle": "Compare fields",
-    "compareIntro": "The same facts for each field, side by side.",
-    "compareRows": {
-      "status": "Status",
-      "marks": "Marks needed vs yours",
-      "step": "Extra step",
-      "stepsDone": "Steps done",
-      "test": "Entry test",
-      "years": "Years",
-      "time": "Time to entry",
-      "confidence": "Rule confidence"
-    },
-    "compareStep": {
-      "none": "None",
-      "marks": "Marks up to {min}%",
-      "bridge": "Bridge or extra courses",
-      "check": "Check with the university",
-      "group": "Choose {groups}",
-      "any_group": "Choose an intermediate group"
+      "needs_education": "Tell PAI your education first"
     },
     "confidence": {
       "official": "Official",
       "secondary": "Secondary source",
       "uncertain": "Uncertain"
     },
-    "notKnown": "Not known",
-    "open": "See route for {title}",
-    "sheet": {
-      "now": "Now",
-      "needs": "What you need",
-      "test": "Entry test",
-      "degree": "Degree ({n} years)",
-      "degreeNoYears": "Degree",
-      "nothingExtra": "Nothing extra from your education.",
-      "noTest": "No entry test listed for this field.",
-      "pass": "pass mark {n}%",
-      "sources": "Sources",
-      "noSources": "No sources listed yet.",
-      "choose": "Choose this route",
-      "chosen": "This is your route",
-      "replaces": "Choosing this replaces your current route.",
-      "close": "Close",
-      "checked": "Checked {date}"
-    },
-    "route": {
-      "title": "Your route",
-      "progress": "{done} of {total}",
-      "progressLabel": "{done} of {total} steps done",
-      "change": "Change route",
-      "changeConfirm": "Stop following {title}? Your ticks are kept in your history.",
-      "changeYes": "Yes, change route",
-      "changeNo": "Keep it",
-      "changed": "Your situation changed: now {status}.",
-      "checkin": "How is it going?",
-      "family": "Prepare to talk with family",
-      "familyIntro": "Prepare a calm conversation with someone whose opinion matters to you."
-    },
-    "empty": {
-      "educationTitle": "Tell PAI your education first",
-      "educationBody": "PAI checks each field against your current education and marks.",
-      "educationAction": "Go to Vault",
-      "pathsTitle": "PAI is working out your fields",
-      "pathsBody": "Your paths are found on their own as PAI learns about you. They show here once ready.",
-      "pathsAction": "See your paths",
-      "undergrad": "Undergraduate entry rules only for now."
-    },
-    "error": "This did not save. Try again.",
-    "statusNow": {
-      "open": "open to you",
-      "step": "a step away",
-      "not_open": "not open from your group",
-      "unknown": "not checkable right now"
-    },
-    "compareCorner": "Field",
-    "compareLimits": {
-      "min": 2,
-      "max": 3
-    },
-    "compareHint": "Tick 2 or 3 fields to compare them side by side.",
-    "yourRouteChip": "Your route",
-    "time": {
-      "entryShort": "About {months} months",
-      "notConfirmed": "Not confirmed",
-      "intake": "Entry: {label}, {month} {year}",
-      "when": "{month} {year}",
-      "confidence": "Dates: {confidence}"
-    },
-    "steps": {
-      "title": "Your steps",
-      "rule": "Rule",
-      "ruleLabel": "Rule source for this step: {host}",
-      "legend": "Green is done, yellow is partly done, red is not yet.",
-      "none": "PAI has no steps for this field yet.",
-      "tick": "Mark as done"
-    }
+    "checkUniversity": "Check with the university",
+    "checked": "Admission rules last checked {date}."
   },
-  "pathMayBeOld": "Your Vault changed since PAI wrote this, so parts of it may be out of date.",
   "mirror": {
     "title": "Your Mirror",
     "intro": "What PAI knows about you, drawn from your Vault.",

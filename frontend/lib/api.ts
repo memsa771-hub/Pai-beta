@@ -252,26 +252,6 @@ class WorkspaceApi {
     return this.request<NetworkDiscovery>(`/v1/discover?network=${this.workspaceId}`);
   }
 
-  /** The Roadmap page: which fields the student can get into, computed on read. */
-  async getRoadmapPage(): Promise<import('./roadmap').RoadmapPage> {
-    return this.request(`/v1/roadmap?network=${this.requireWorkspace()}`);
-  }
-
-  async chooseRoute(fieldKey: string): Promise<import('./roadmap').ChosenRoute> {
-    return this.request(`/v1/roadmap/choose?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ field_key: fieldKey }) });
-  }
-
-  /** Tick or untick one step of the chosen route, named by its key. */
-  async setRouteStep(key: string, done: boolean): Promise<import('./roadmap').ChosenRoute> {
-    return this.request(`/v1/roadmap/steps?network=${this.requireWorkspace()}`,
-      { method: 'POST', body: JSON.stringify({ key, done }) });
-  }
-
-  async withdrawRoute(): Promise<import('./roadmap').ChosenRoute> {
-    return this.request(`/v1/roadmap/withdraw?network=${this.requireWorkspace()}`, { method: 'POST' });
-  }
-
   /** The Mirror state card, computed from the Vault on this read. */
   async getMirror(): Promise<import('./mirror').MirrorCard> {
     const state = await this.request<import('./mirror').MirrorState>(`/v1/counselor/summary?network=${this.requireWorkspace()}`);
@@ -346,27 +326,26 @@ class WorkspaceApi {
   async answerFactCard(id:string,body:Record<string,unknown>):Promise<unknown> {
     return this.request(`/v1/counselor/fact-cards/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify(body)});
   }
-  async getPath(id:string):Promise<import('./counselor-workspace').PathResult> {
-    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}?network=${this.requireWorkspace()}`);
-  }
-  async getPrograms(id:string):Promise<import('./counselor-workspace').Programs> {
-    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/programs?network=${this.requireWorkspace()}`);
-  }
-  async searchPrograms(id:string):Promise<unknown> {
-    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/programs?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({explore_places:true})});
-  }
-  async acceptPathActivity(id:string):Promise<{status:string;available_at:string}> {
-    return this.request(`/v1/counselor/paths/${encodeURIComponent(id)}/try-it?network=${this.requireWorkspace()}`,{method:'POST',body:JSON.stringify({accepted:true})});
-  }
   async getPossibilities(): Promise<import('./possibilities').Possibility[]> {
     const result = await this.request<{ possibilities: import('./possibilities').Possibility[] }>(
       `/v1/counselor/possibilities?network=${this.requireWorkspace()}`);
     return result.possibilities;
   }
 
-  async changePossibility(id: string, action: 'explore' | 'save' | 'dismiss'): Promise<import('./possibilities').Possibility> {
+  /** Save, set aside, or choose a path. Choosing makes it the student's one
+   * chosen path (the decision record PAI OS reads); choosing another later
+   * replaces it. */
+  async changePossibility(id: string, action: 'save' | 'dismiss' | 'choose'): Promise<import('./possibilities').Possibility> {
     return this.request(`/v1/counselor/possibilities/${encodeURIComponent(id)}/${action}?network=${this.requireWorkspace()}`,
       { method: 'POST' });
+  }
+
+  /** The Compare table: each picked path's eligibility from the student's
+   * education, read now. */
+  async comparePaths(ids: string[]): Promise<import('./path-compare').PathComparison> {
+    const query = new URLSearchParams({ network: this.requireWorkspace() });
+    ids.forEach((id) => query.append('ids', id));
+    return this.request(`/v1/counselor/possibilities/compare?${query}`);
   }
 
   /** A path the student puts in themselves; PAI then checks it against them. */

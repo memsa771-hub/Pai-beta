@@ -1,6 +1,6 @@
 from app.pai_c.paths.fields import known_groups, study_fields
 from app.pai_c.policy.controller import load_data
-from app.pai_c.roadmap.rules import ibcc_percent, rule_for
+from app.pai_c.paths.admission import ibcc_percent, rule_for
 
 CONFIDENCE = {"official", "secondary", "uncertain"}
 
@@ -58,6 +58,6 @@ def test_years_per_field_override():
 
 
 def test_null_groups_open_means_use_study_field_open_to():
-    """None is the contract: the roadmap engine falls back to open_to in study_fields.json."""
+    """None is the contract: path eligibility falls back to open_to in study_fields.json."""
     for key in ("zoology", "food_science", "hospitality_tourism", "sports_sciences"):
         assert rule_for(key).groups_open is None

@@ -3,7 +3,7 @@
  * here" card, sub-tabs and the command menu. Copy lives in copy.json. */
 import * as React from "react";
 import { motion } from "motion/react";
-import { CornerDownLeft, FolderLock, LayoutDashboard, Map, MessageCircle, Route, Settings, type LucideIcon } from "lucide-react";
+import { Compass, CornerDownLeft, FolderLock, LayoutDashboard, MessageCircle, Route, Settings, type LucideIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut,
@@ -19,7 +19,7 @@ export type SubView = keyof typeof copy.subTabs;
 export const SECTIONS: { key: SectionKey; icon: LucideIcon; views: string[] }[] = [
   { key: "overview", icon: LayoutDashboard, views: ["overview"] },
   { key: "threads", icon: MessageCircle, views: ["threads", "notifications"] },
-  { key: "roadmaps", icon: Map, views: ["paths", "roadmap"] },
+  { key: "paths", icon: Compass, views: ["paths"] },
   { key: "journey", icon: Route, views: ["journey"] },
   { key: "vault", icon: FolderLock, views: ["files", "profile", "mirror"] },
   { key: "settings", icon: Settings, views: ["settings"] },

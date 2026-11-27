@@ -7,9 +7,10 @@ import { usePaiAuth } from '@/lib/pai-auth-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout, type ViewMode } from './layout-context';
 
-const VIEWS: ViewMode[] = ['threads', 'roadmap', 'profile', 'notifications', 'files', 'inbox'];
-/** Older saved views that now live on the one Roadmap page. */
-const RENAMED: Record<string, ViewMode> = { roadmaps: 'roadmap', compare: 'roadmap', plan: 'roadmap' };
+const VIEWS: ViewMode[] = ['threads', 'paths', 'profile', 'notifications', 'files', 'inbox'];
+/** Older saved views of the removed Roadmap page (and its Compare and Plan
+ * tabs) now open Paths, where paths are compared and chosen. */
+const RENAMED: Record<string, ViewMode> = { roadmap: 'paths', roadmaps: 'paths', compare: 'paths', plan: 'paths' };
 
 /** Desktop restore state only; web layout, data loading, and UI stay shared. */
 export function useDesktopWorkspaceState(): void {
