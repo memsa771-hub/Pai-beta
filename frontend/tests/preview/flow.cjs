@@ -65,7 +65,9 @@ module.exports = async function flow(browser, open, ORIGIN) {
     // F-I: Paths only. No Explore and no Roadmap; paths are compared side by
     // side and one is chosen with one explicit confirm. Nothing is chosen for
     // the student, and asking about the chosen path is a chat draft, not a send.
-    await page.getByRole('navigation').getByRole('button', { name: 'Paths', exact: true }).click();
+    await page.keyboard.press('Escape'); // close the Vault entry dialog the step above opened
+    await page.getByRole('dialog').waitFor({ state: 'detached' });
+    await page.getByRole('navigation').getByRole('button', { name: 'Paths', exact: true }).first().click();
     await page.getByRole('heading', { name: 'Your paths' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Explore', exact: true }).count(), 0, 'no Explore on Paths');
     assert.equal(await page.getByRole('group', { name: 'Sections' }).count(), 0, 'Paths has no Roadmap tab');
